@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VitalScan · 60-Second Face Scan</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23070b14'/%3E%3Cpath d='M20 50 L34 50 L42 30 L52 70 L60 44 L66 50 L80 50' stroke='%2300e5a8' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<title>Vytaly · 60-Second Face Scan</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23070b14'/%3E%3Cpath d='M16 30 L30 30 L37 30 L44 64 L52 22 L59 50 L64 42 L70 50 L84 50' stroke='%2300e5a8' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#070b14; --panel:#0e1424; --panel2:#131b2e; --line:#1e2940;
@@ -24,54 +24,59 @@
     display:flex;align-items:center;justify-content:center}
   .logo svg{width:22px;height:22px}
   h1{font-size:18px;font-weight:700;letter-spacing:.3px}
-  .tag{font-size:10.5px;color:var(--muted);margin-bottom:16px;letter-spacing:.4px;text-transform:uppercase}
+  .tag{font-size:10.5px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
 
-  .stage{position:relative;width:100%;aspect-ratio:4/5;border-radius:22px;overflow:hidden;
+  /* who's scanning chip */
+  .who{margin:12px 0 4px;display:flex;align-items:center;gap:9px;background:var(--panel);
+    border:1px solid var(--line);border-radius:13px;padding:9px 13px;cursor:pointer}
+  .who .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#06b6d4);
+    color:#04140f;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .who .nm{font-weight:700;font-size:14px}
+  .who .meta{font-size:11px;color:var(--muted)}
+  .who .chev{margin-left:auto;color:var(--muted);font-size:13px}
+
+  .stage{position:relative;width:100%;aspect-ratio:4/5;border-radius:22px;overflow:hidden;margin-top:10px;
     background:#05080f;border:1px solid var(--line);box-shadow:0 20px 50px rgba(0,0,0,.5)}
-  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);
-    filter:saturate(1.05)}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:saturate(1.05)}
   .oval{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);
     width:56%;aspect-ratio:3/4;border:2.5px dashed rgba(255,255,255,.5);border-radius:50%;
     transition:border-color .3s, box-shadow .3s;pointer-events:none}
   .oval.good{border-color:var(--accent);border-style:solid;box-shadow:0 0 0 4000px rgba(5,8,15,.55),0 0 30px rgba(0,229,168,.4)}
   .oval.bad{border-color:var(--amber)}
-  .hint{position:absolute;left:0;right:0;bottom:16px;text-align:center;font-size:13px;
-    color:#fff;text-shadow:0 1px 4px #000;padding:0 24px;font-weight:500}
+  .hint{position:absolute;left:0;right:0;bottom:16px;text-align:center;font-size:13px;color:#fff;
+    text-shadow:0 1px 4px #000;padding:0 24px;font-weight:500}
   .ring{position:absolute;top:14px;left:50%;transform:translateX(-50%)}
   .ring svg{transform:rotate(-90deg)}
-  .ring .t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-size:20px;font-weight:700}
+  .ring .t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700}
   .pulsedot{position:absolute;top:18px;right:18px;width:12px;height:12px;border-radius:50%;
     background:var(--accent);opacity:0;box-shadow:0 0 12px var(--accent)}
 
   .controls{margin-top:16px;display:flex;gap:10px}
-  button{flex:1;padding:15px;border-radius:14px;border:none;font-size:15px;font-weight:700;
-    cursor:pointer;letter-spacing:.3px;transition:transform .1s,opacity .2s}
+  button{flex:1;padding:15px;border-radius:14px;border:none;font-size:15px;font-weight:700;cursor:pointer;
+    letter-spacing:.3px;transition:transform .1s,opacity .2s;font-family:inherit}
   button:active{transform:scale(.97)}
   .primary{background:linear-gradient(135deg,var(--accent),#06b6d4);color:#04140f}
   .ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line);flex:0 0 auto;width:54px}
   button:disabled{opacity:.4;cursor:not-allowed}
 
-  .wave{margin-top:14px;height:64px;width:100%;background:var(--panel);border:1px solid var(--line);
-    border-radius:14px;overflow:hidden}
+  .wave{margin-top:14px;height:64px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 
-  /* profile */
   .profile{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
   .profile summary{list-style:none;cursor:pointer;padding:13px 16px;font-size:12.5px;font-weight:600;
     display:flex;justify-content:space-between;align-items:center;color:var(--muted)}
   .profile summary::-webkit-details-marker{display:none}
-  .profile-body{padding:0 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .pbody{padding:0 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .field{display:flex;flex-direction:column;gap:5px}
+  .field.full{grid-column:1/-1}
   .field label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
   .field input,.field select{background:var(--panel2);border:1px solid var(--line);border-radius:9px;
-    color:var(--txt);padding:9px 11px;font-size:14px;font-family:inherit}
+    color:var(--txt);padding:10px 11px;font-size:14px;font-family:inherit;width:100%}
 
   .sec-h{display:flex;align-items:center;gap:8px;margin:22px 2px 11px;font-size:11px;
     text-transform:uppercase;letter-spacing:.7px;font-weight:700}
   .sec-h .pill{font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
   .pill.real{background:rgba(52,211,153,.16);color:var(--green)}
   .pill.est{background:rgba(251,191,36,.15);color:var(--amber)}
-  .pill.lock{background:rgba(126,138,163,.16);color:var(--muted)}
   .sec-h .line{flex:1;height:1px;background:var(--line)}
 
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
@@ -86,26 +91,57 @@
   .q-bar{height:5px;border-radius:3px;background:var(--line);margin-top:8px;overflow:hidden}
   .q-fill{height:100%;width:0;background:var(--accent);transition:width .3s,background .3s}
 
-  .card.locked{background:repeating-linear-gradient(135deg,#0c1220,#0c1220 10px,#0e1526 10px,#0e1526 20px);
-    border-style:dashed}
-  .card.locked .val{color:#3a465e;filter:blur(.5px)}
-  .lockico{position:absolute;top:12px;right:12px;font-size:13px;opacity:.6}
+  /* history */
+  .hist{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:15px}
+  .hist h3{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between}
+  .spark{width:100%;height:54px;display:block;margin-bottom:8px}
+  .hrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+  .hrow:first-of-type{border-top:none}
+  .hrow .d{color:var(--muted);font-size:11px;flex:1}
+  .hrow b{font-weight:700}
+  .hrow .s{font-size:11px;color:var(--muted)}
+  .empty{color:var(--muted);font-size:12px;text-align:center;padding:10px 0}
 
   .note{margin-top:22px;font-size:11px;color:var(--muted);line-height:1.65;
     background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px}
   .note b{color:var(--txt)}
   .disclaimer{margin-top:14px;font-size:10px;color:#5a667e;text-align:center;line-height:1.55}
-  .hidden{display:none}
+  .hidden{display:none!important}
+
+  /* overlay */
+  .ov{position:fixed;inset:0;background:rgba(4,7,13,.82);backdrop-filter:blur(6px);z-index:50;
+    display:flex;align-items:center;justify-content:center;padding:18px}
+  .sheet{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:22px;
+    padding:22px;max-height:90vh;overflow:auto}
+  .sheet h2{font-size:18px;margin-bottom:4px}
+  .sheet p.s{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+  .person{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--line);border-radius:13px;
+    margin-bottom:9px;cursor:pointer;transition:border-color .2s}
+  .person:hover{border-color:var(--accent)}
+  .person .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),#6366f1);
+    color:#04140f;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .person.guest .av{background:linear-gradient(135deg,#4b5670,#2c3650);color:#cbd5e1}
+  .person .nm{font-weight:700;font-size:14px}
+  .person .meta{font-size:11px;color:var(--muted)}
+  .person .active-tick{margin-left:auto;color:var(--accent);font-weight:800}
+  .ovbtns{display:flex;gap:10px;margin-top:14px}
+  .link{background:none;border:none;color:var(--accent2);font-size:13px;cursor:pointer;padding:8px;font-weight:600}
   @keyframes ping{0%{transform:scale(.8);opacity:1}100%{transform:scale(2.2);opacity:0}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="logo"><svg viewBox="0 0 100 100"><path d="M20 50 L34 50 L42 30 L52 70 L60 44 L66 50 L80 50" stroke="#00e5a8" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <div><h1>VitalScan</h1></div>
+    <div class="logo"><svg viewBox="0 0 100 100"><path d="M16 32 L30 32 L37 32 L45 66 L53 22 L60 52 L65 44 L71 52 L84 52" stroke="#00e5a8" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div><h1>Vyta<span style="color:var(--accent)">ly</span></h1></div>
   </header>
-  <div class="tag">60-Second Face Scan · rPPG Proof of Concept · 100% On-Device</div>
+  <div class="tag">60-Second Face Scan · rPPG · 100% On-Device</div>
+
+  <div class="who" id="whoChip">
+    <div class="av" id="whoAv">G</div>
+    <div><div class="nm" id="whoName">Guest</div><div class="meta" id="whoMeta">Tap to switch person</div></div>
+    <div class="chev">▾</div>
+  </div>
 
   <div class="stage">
     <video id="video" playsinline muted></video>
@@ -117,7 +153,7 @@
         <circle id="ringArc" cx="28" cy="28" r="24" stroke="#00e5a8" stroke-width="5" fill="none"
           stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"/>
       </svg>
-      <div class="t" id="ringT">30</div>
+      <div class="t" id="ringT">40</div>
     </div>
     <div class="hint" id="hint">Tap Start, then fill the oval with your face</div>
   </div>
@@ -130,8 +166,8 @@
   <canvas class="wave" id="wave" width="480" height="64"></canvas>
 
   <details class="profile" id="profile">
-    <summary><span>👤 Your profile <span style="opacity:.7">(improves several metrics)</span></span><span>▾</span></summary>
-    <div class="profile-body">
+    <summary><span>👤 Profile for <b id="profForName">Guest</b> <span style="opacity:.7">· improves metrics</span></span><span>▾</span></summary>
+    <div class="pbody">
       <div class="field"><label>Age</label><input id="pAge" type="number" inputmode="numeric" placeholder="35"></div>
       <div class="field"><label>Sex</label><select id="pSex"><option value="">—</option><option value="m">Male</option><option value="f">Female</option></select></div>
       <div class="field"><label>Height (cm)</label><input id="pHt" type="number" inputmode="numeric" placeholder="175"></div>
@@ -140,7 +176,7 @@
   </details>
 
   <!-- MEASURED -->
-  <div class="sec-h"><span>Measured</span><span class="pill real">✓ REAL rPPG</span><span class="line"></span></div>
+  <div class="sec-h"><span>Measured from your pulse</span><span class="pill real">✓ REAL rPPG</span><span class="line"></span></div>
   <div class="grid">
     <div class="card hero">
       <div>
@@ -155,26 +191,61 @@
       </div>
     </div>
   </div>
+  <div class="grid" id="measuredGrid" style="margin-top:11px"></div>
 
   <!-- DERIVED -->
-  <div class="sec-h"><span>Derived from your pulse</span><span class="pill est">~ ESTIMATE</span><span class="line"></span></div>
+  <div class="sec-h"><span>Derived insights</span><span class="pill est">~ ESTIMATE</span><span class="line"></span></div>
   <div class="grid" id="derivedGrid"></div>
 
-  <!-- LOCKED / AI MODEL -->
-  <div class="sec-h"><span>Lab-grade biomarkers</span><span class="pill lock">🔒 AI MODEL · PHASE 2</span><span class="line"></span></div>
-  <div class="grid" id="lockedGrid"></div>
+  <!-- HISTORY -->
+  <div class="sec-h"><span>Scan history</span><span class="line"></span></div>
+  <div class="hist">
+    <h3><span id="histName">Guest</span><span id="histCount" style="color:var(--muted)"></span></h3>
+    <canvas class="spark" id="spark" width="440" height="54"></canvas>
+    <div id="histList"><div class="empty">No scans yet — run your first scan above.</div></div>
+  </div>
 
   <div class="note">
-    <b>Honest by design.</b> <b style="color:var(--green)">Heart rate</b> is genuinely measured — the camera reads
-    tiny color changes in your skin as blood pulses through it (real rPPG, same principle as SymCheck).
-    The <b style="color:var(--amber)">amber</b> metrics are estimated from that pulse using standard physiological
-    formulas — directional, not clinical. The <b>🔒 locked</b> biomarkers (glucose, blood pressure, SpO₂, hemoglobin…)
-    require trained AI models built on labeled medical datasets — that's <b>Phase 2</b>, and the premium tier.
-    We will never show you a made-up medical number.
+    <b>Honest by design.</b> The <b style="color:var(--green)">green</b> metrics are genuinely measured —
+    heart rate and beat-to-beat timing read straight from blood flow under your skin (real rPPG).
+    The <b style="color:var(--amber)">amber</b> metrics are derived from that pulse with standard physiological
+    formulas (directional, not clinical). <b>Not shown yet:</b> blood pressure, glucose, SpO₂, hemoglobin —
+    those need trained AI models on labeled medical data (<b>Phase 2</b>). We will never display a made-up medical number.
   </div>
   <div class="disclaimer">
     Not a medical device. Demonstration only — do not use for any health decision.<br>
-    Camera video never leaves your device; all processing is local.
+    Everything (video, profiles, history) stays on this device. Cloud accounts come in Phase 2.
+  </div>
+</div>
+
+<!-- People overlay -->
+<div class="ov hidden" id="peopleOv">
+  <div class="sheet">
+    <div id="peopleView">
+      <h2>Who's scanning?</h2>
+      <p class="s">Pick a person to keep their history separate, or scan as a guest.</p>
+      <div id="peopleList"></div>
+      <div class="person guest" id="guestRow">
+        <div class="av">G</div><div><div class="nm">Guest</div><div class="meta">No saved history</div></div>
+      </div>
+      <div class="ovbtns"><button class="primary" id="addPersonBtn">＋ Add person</button></div>
+    </div>
+    <div id="addView" class="hidden">
+      <h2>Add person</h2>
+      <p class="s">Stored locally on this device. Email is just a label for now — no account yet.</p>
+      <div class="pbody" style="padding:0">
+        <div class="field full"><label>Name</label><input id="aName" placeholder="Alex Rivera"></div>
+        <div class="field full"><label>Email</label><input id="aEmail" type="email" placeholder="alex@email.com"></div>
+        <div class="field"><label>Age</label><input id="aAge" type="number" inputmode="numeric" placeholder="35"></div>
+        <div class="field"><label>Sex</label><select id="aSex"><option value="">—</option><option value="m">Male</option><option value="f">Female</option></select></div>
+        <div class="field"><label>Height (cm)</label><input id="aHt" type="number" inputmode="numeric" placeholder="175"></div>
+        <div class="field"><label>Weight (kg)</label><input id="aWt" type="number" inputmode="numeric" placeholder="75"></div>
+      </div>
+      <div class="ovbtns">
+        <button class="ghost" id="cancelAdd" style="flex:1">Cancel</button>
+        <button class="primary" id="saveAdd">Save & select</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -189,18 +260,76 @@ const ring=$('ring'), ringArc=$('ringArc'), ringT=$('ringT'), pulsedot=$('pulsed
 const wave=$('wave'), wctx=wave.getContext('2d');
 
 let stream=null, scanning=false, raf=null;
-const SCAN_SECONDS=30, FS_TARGET=30;
+const SCAN_SECONDS=40, FS_TARGET=30;   // 40s for better HRV (RMSSD/pNN50)
 let samples=[], startT=0;
 
-// ---------- profile (persisted) ----------
-const PKEYS={pAge:'',pSex:'',pHt:'',pWt:''};
-function loadProfile(){try{const p=JSON.parse(localStorage.getItem('vs_profile')||'{}');for(const k in PKEYS)if(p[k]!=null)$(k).value=p[k];}catch(e){}}
-function saveProfile(){const p={};for(const k in PKEYS)p[k]=$(k).value;localStorage.setItem('vs_profile',JSON.stringify(p));}
-function getProfile(){return{age:+$('pAge').value||null,sex:$('pSex').value||null,ht:+$('pHt').value||null,wt:+$('pWt').value||null};}
-['pAge','pSex','pHt','pWt'].forEach(k=>$(k)&&$(k).addEventListener('change',saveProfile));
-loadProfile();
+/* ===================== DATA LAYER (local) ===================== */
+const DB={
+  users:()=>JSON.parse(localStorage.getItem('vs_users')||'[]'),
+  saveUsers:u=>localStorage.setItem('vs_users',JSON.stringify(u)),
+  active:()=>localStorage.getItem('vs_active')||'',
+  setActive:id=>localStorage.setItem('vs_active',id),
+  hist:()=>JSON.parse(localStorage.getItem('vs_history')||'{}'),
+  saveHist:h=>localStorage.setItem('vs_history',JSON.stringify(h)),
+  onboarded:()=>localStorage.getItem('vs_onboarded')==='1',
+  setOnboarded:()=>localStorage.setItem('vs_onboarded','1'),
+};
+const uid=()=>'u'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
+function activePerson(){
+  const a=DB.active();
+  if(a==='guest'||a==='') return {id:'guest',name:'Guest',guest:true};
+  const u=DB.users().find(x=>x.id===a);
+  return u||{id:'guest',name:'Guest',guest:true};
+}
+function initials(n){return (n||'G').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'G';}
 
-// ---------- camera ----------
+/* ===================== PROFILE (bound to active person) ===================== */
+function refreshPersonUI(){
+  const p=activePerson();
+  $('whoAv').textContent=p.guest?'G':initials(p.name);
+  $('whoName').textContent=p.name;
+  $('whoMeta').textContent=p.guest?'Guest · tap to switch':(p.email||'tap to switch person');
+  $('profForName').textContent=p.name;
+  $('pAge').value=p.age||''; $('pSex').value=p.sex||''; $('pHt').value=p.ht||''; $('pWt').value=p.wt||'';
+  renderHistory();
+}
+function getProfile(){const p=activePerson();return{age:+($('pAge').value||p.age)||null,sex:$('pSex').value||p.sex||null,ht:+($('pHt').value||p.ht)||null,wt:+($('pWt').value||p.wt)||null};}
+function persistProfileEdits(){
+  const p=activePerson(); if(p.guest) return; // guest edits are ephemeral
+  const users=DB.users(); const u=users.find(x=>x.id===p.id); if(!u) return;
+  u.age=+$('pAge').value||null; u.sex=$('pSex').value||null; u.ht=+$('pHt').value||null; u.wt=+$('pWt').value||null;
+  DB.saveUsers(users);
+}
+['pAge','pSex','pHt','pWt'].forEach(k=>$(k).addEventListener('change',persistProfileEdits));
+
+/* ===================== PEOPLE OVERLAY ===================== */
+function openPeople(force){
+  $('peopleOv').classList.remove('hidden');
+  $('peopleView').classList.remove('hidden'); $('addView').classList.add('hidden');
+  const list=$('peopleList'); const users=DB.users(); const act=DB.active();
+  list.innerHTML=users.map(u=>`<div class="person" data-id="${u.id}">
+      <div class="av">${initials(u.name)}</div>
+      <div><div class="nm">${u.name}</div><div class="meta">${u.email||(u.age?u.age+' yrs':'')||'saved'}</div></div>
+      ${act===u.id?'<div class="active-tick">✓</div>':''}</div>`).join('')
+    || `<div class="empty" style="margin-bottom:8px">No people saved yet.</div>`;
+  list.querySelectorAll('.person').forEach(el=>el.onclick=()=>selectPerson(el.dataset.id));
+}
+function closePeople(){$('peopleOv').classList.add('hidden');}
+function selectPerson(id){DB.setActive(id);DB.setOnboarded();closePeople();refreshPersonUI();}
+$('whoChip').onclick=()=>openPeople(false);
+$('guestRow').onclick=()=>selectPerson('guest');
+$('addPersonBtn').onclick=()=>{$('peopleView').classList.add('hidden');$('addView').classList.remove('hidden');};
+$('cancelAdd').onclick=()=>openPeople(false);
+$('saveAdd').onclick=()=>{
+  const name=$('aName').value.trim(); if(!name){$('aName').focus();return;}
+  const u={id:uid(),name,email:$('aEmail').value.trim(),age:+$('aAge').value||null,
+    sex:$('aSex').value||null,ht:+$('aHt').value||null,wt:+$('aWt').value||null};
+  const users=DB.users();users.push(u);DB.saveUsers(users);
+  ['aName','aEmail','aAge','aSex','aHt','aWt'].forEach(k=>$(k).value='');
+  selectPerson(u.id);
+};
+
+/* ===================== CAMERA ===================== */
 async function initCamera(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});
@@ -208,7 +337,6 @@ async function initCamera(){
     hint.textContent='Fill the oval with your face, hold still, good light'; return true;
   }catch(e){ hint.textContent='⚠ Camera blocked. Open over https:// or localhost and allow camera.'; return false; }
 }
-
 function sampleFrame(){
   const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
   const sx=vw*0.30, sy=vh*0.22, sw=vw*0.40, sh=vh*0.30;
@@ -220,7 +348,6 @@ function sampleFrame(){
   if(n<500) return {ok:false};
   return {ok:true,r:r/n,g:g/n,b:b/n};
 }
-
 function loop(){
   if(!scanning) return;
   const now=performance.now();
@@ -234,7 +361,7 @@ function loop(){
   raf=requestAnimationFrame(loop);
 }
 
-// ================= SIGNAL PROCESSING (real rPPG core) =================
+/* ===================== SIGNAL PROCESSING (real rPPG) ===================== */
 function resample(sig,times,fs){
   if(times.length<2)return[];
   const t0=times[0],t1=times[times.length-1],N=Math.floor((t1-t0)/1000*fs),out=[];let j=0;
@@ -257,64 +384,74 @@ function estimate(raw){
   const filtered=bandpass(g,FS_TARGET,0.7,4.0);
   const hrBand=dominantFreq(filtered,FS_TARGET,0.7,3.0,0.01);
   const bpm=Math.round(hrBand.freq*60);
+  // respiration
   const resp=bandpass(detrend(resample(raw.map(s=>s.g),times,FS_TARGET)),FS_TARGET,0.12,0.5);
   const rrBand=dominantFreq(resp,FS_TARGET,0.12,0.5,0.005);
   const rr=Math.round(rrBand.freq*60);
-  const pk=peaks(filtered); let hrv=null;
-  if(pk.length>4){const ibis=[];for(let i=1;i<pk.length;i++)ibis.push((pk[i]-pk[i-1])/FS_TARGET*1000);
-    const mean=ibis.reduce((a,b)=>a+b,0)/ibis.length;const sd=Math.sqrt(ibis.reduce((a,b)=>a+(b-mean)**2,0)/ibis.length);hrv=Math.round(sd);}
+  // beat timing -> real HRV family
+  const pk=peaks(filtered);
+  let sdnn=null,rmssd=null,pnn50=null,meanIBI=null;
+  if(pk.length>4){
+    const ibi=[];for(let i=1;i<pk.length;i++)ibi.push((pk[i]-pk[i-1])/FS_TARGET*1000);
+    // filter implausible intervals (300-1500ms ~ 40-200bpm)
+    const f=ibi.filter(v=>v>300&&v<1500);
+    if(f.length>3){
+      meanIBI=Math.round(f.reduce((a,b)=>a+b,0)/f.length);
+      const mean=meanIBI;
+      sdnn=Math.round(Math.sqrt(f.reduce((a,b)=>a+(b-mean)**2,0)/f.length));
+      let sq=0,nn=0;for(let i=1;i<f.length;i++){const dd=f[i]-f[i-1];sq+=dd*dd;if(Math.abs(dd)>50)nn++;}
+      rmssd=Math.round(Math.sqrt(sq/(f.length-1)));
+      pnn50=Math.round(nn/(f.length-1)*100);
+    }
+  }
   const quality=Math.max(0,Math.min(1,(hrBand.snr-1)/6));
-  return {bpm,rr,hrv,filtered,quality};
+  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,filtered,quality};
 }
 
-// ============ DERIVED biomarkers (physiological formulas; estimates) ============
+/* ===================== DERIVED (formula estimates) ===================== */
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function deriveBiomarkers(e,prof){
-  const {bpm,rr,hrv}=e, age=prof.age, ht=prof.ht, wt=prof.wt;
-  const out={};
-  out.hrv = hrv!=null?hrv:null;
-  out.rr  = rr||null;
-  out.prq = (bpm&&rr)? +(bpm/rr).toFixed(1):null;                 // pulse-respiratory quotient
-  out.stress = hrv!=null? clamp(Math.round(120-hrv*0.9),1,99):null;
-  out.pns = hrv!=null? +clamp(hrv/12,0,10).toFixed(1):null;       // parasympathetic index 0-10
-  out.sns = hrv!=null? +clamp(10-hrv/12+(bpm-65)/9,0,10).toFixed(1):null;
-  out.fatigue = hrv!=null? clamp(Math.round((bpm-55)*1.2+(50-hrv)*0.8),1,99):null;
-  if(age&&bpm){const hrMax=208-0.7*age; out.vo2=clamp(Math.round(15.3*hrMax/bpm),18,72);}else out.vo2=null;
-  if(age){let ba=age+(bpm-65)*0.12-((hrv||40)-40)*0.10; out.bioAge=clamp(Math.round(ba),16,95);}else out.bioAge=null;
-  if(ht&&wt){out.bmi=+(wt/((ht/100)**2)).toFixed(1);}else out.bmi=null;
-  // wellness composite 0-100
-  let w=100; if(out.stress)w-=out.stress*0.25; if(bpm>70)w-=(bpm-70)*0.4; if(hrv!=null)w+=Math.min(hrv,80)*0.25;
-  out.wellness=clamp(Math.round(w),1,100);
-  return out;
+  const {bpm,rr,sdnn,rmssd}=e, age=prof.age, ht=prof.ht, wt=prof.wt, hrv=sdnn;
+  const o={};
+  o.prq=(bpm&&rr)?+(bpm/rr).toFixed(1):null;
+  o.stress=hrv!=null?clamp(Math.round(120-hrv*0.9),1,99):null;
+  o.pns=(rmssd!=null)?+clamp(rmssd/10,0,10).toFixed(1):(hrv!=null?+clamp(hrv/12,0,10).toFixed(1):null);
+  o.sns=hrv!=null?+clamp(10-hrv/12+(bpm-65)/9,0,10).toFixed(1):null;
+  o.ans=(o.pns!=null&&o.sns!=null)?(o.pns>=o.sns?'Recovery':'Activated'):null;
+  o.fatigue=hrv!=null?clamp(Math.round((bpm-55)*1.2+(50-hrv)*0.8),1,99):null;
+  if(age&&bpm){const hrMax=208-0.7*age;o.vo2=clamp(Math.round(15.3*hrMax/bpm),18,72);}else o.vo2=null;
+  if(age){let ba=age+(bpm-65)*0.12-((hrv||40)-40)*0.10;o.bioAge=clamp(Math.round(ba),16,95);}else o.bioAge=null;
+  o.bmi=(ht&&wt)?+(wt/((ht/100)**2)).toFixed(1):null;
+  let w=100;if(o.stress)w-=o.stress*0.25;if(bpm>70)w-=(bpm-70)*0.4;if(hrv!=null)w+=Math.min(hrv,80)*0.25;
+  o.wellness=clamp(Math.round(w),1,100);
+  return o;
 }
 
-// ============ UI render ============
-const DERIVED_TILES=[
-  {k:'hrv',  lbl:'HR Variability', u:'ms',   need:''},
-  {k:'rr',   lbl:'Respiratory Rate',u:'/min',need:''},
-  {k:'prq',  lbl:'Pulse-Resp Quotient',u:'',need:''},
-  {k:'stress',lbl:'Stress Level',  u:'/100', need:''},
-  {k:'pns',  lbl:'Parasympathetic',u:'/10',  need:''},
-  {k:'sns',  lbl:'Sympathetic',    u:'/10',  need:''},
-  {k:'vo2',  lbl:'VO₂ Max',        u:'',     need:'age'},
-  {k:'bioAge',lbl:'Biological Age',u:'yrs',  need:'age'},
-  {k:'bmi',  lbl:'Body Mass Index',u:'',     need:'height + weight'},
-  {k:'fatigue',lbl:'Fatigue Index',u:'/100', need:''},
-  {k:'wellness',lbl:'Wellness Score',u:'/100',need:''},
+/* ===================== TILES ===================== */
+const MEASURED_TILES=[
+  {k:'sdnn',  lbl:'HRV (SDNN)',      u:'ms'},
+  {k:'rmssd', lbl:'HRV (RMSSD)',     u:'ms'},
+  {k:'rr',    lbl:'Respiratory Rate',u:'/min'},
+  {k:'meanIBI',lbl:'Mean Beat Interval',u:'ms'},
+  {k:'pnn50', lbl:'pNN50',           u:'%'},
 ];
-const LOCKED_TILES=[
-  {lbl:'Blood Pressure',u:'mmHg'},
-  {lbl:'Avg Blood Glucose',u:'mg/dL'},
-  {lbl:'Oxygen Saturation',u:'% SpO₂'},
-  {lbl:'Hemoglobin',u:'g/dL'},
-  {lbl:'Inflammation Index',u:''},
-  {lbl:'Hydration Level',u:'%'},
+const DERIVED_TILES=[
+  {k:'stress', lbl:'Stress Level',       u:'/100',need:''},
+  {k:'pns',    lbl:'Parasympathetic',    u:'/10', need:''},
+  {k:'sns',    lbl:'Sympathetic',        u:'/10', need:''},
+  {k:'ans',    lbl:'ANS Balance',        u:'',    need:''},
+  {k:'prq',    lbl:'Pulse-Resp Quotient',u:'',    need:''},
+  {k:'fatigue',lbl:'Fatigue Index',      u:'/100',need:''},
+  {k:'vo2',    lbl:'VO₂ Max',            u:'',    need:'age'},
+  {k:'bioAge', lbl:'Biological Age',     u:'yrs', need:'age'},
+  {k:'bmi',    lbl:'Body Mass Index',    u:'',    need:'height + weight'},
+  {k:'wellness',lbl:'Wellness Score',    u:'/100',need:''},
 ];
 function buildGrids(){
+  $('measuredGrid').innerHTML=MEASURED_TILES.map(t=>
+    `<div class="card"><div class="lbl">${t.lbl}</div><div><span class="val" id="m_${t.k}">—</span><span class="unit">${t.u}</span></div></div>`).join('');
   $('derivedGrid').innerHTML=DERIVED_TILES.map(t=>
-    `<div class="card"><div class="lbl">${t.lbl}</div><div><span class="val" id="m_${t.k}">—</span><span class="unit">${t.u}</span></div>${t.need?`<div class="sub" id="need_${t.k}"></div>`:''}</div>`).join('');
-  $('lockedGrid').innerHTML=LOCKED_TILES.map(t=>
-    `<div class="card locked"><span class="lockico">🔒</span><div class="lbl">${t.lbl}</div><div><span class="val">•••</span><span class="unit">${t.u}</span></div><div class="sub">Needs trained model</div></div>`).join('');
+    `<div class="card"><div class="lbl">${t.lbl}</div><div><span class="val" id="d_${t.k}">—</span><span class="unit">${t.u}</span></div>${t.need?`<div class="sub" id="need_${t.k}"></div>`:''}</div>`).join('');
 }
 buildGrids();
 
@@ -335,22 +472,53 @@ function setHero(e){
   else{qt.textContent='Low';qt.style.color='var(--red)';qf.style.background='var(--red)';}
   $('hrSub').textContent=e.quality>0.6?'Strong pulse signal locked':'Hold stiller / better light for accuracy';
 }
-function setDerived(b){
-  DERIVED_TILES.forEach(t=>{
-    const el=$('m_'+t.k), v=b[t.k];
-    el.textContent=(v==null||Number.isNaN(v))?'—':v;
-    const ne=$('need_'+t.k);
-    if(ne) ne.textContent=(v==null)?('add '+t.need+' ↑'):'';
-  });
+function setMetrics(e,b){
+  MEASURED_TILES.forEach(t=>{const v=e[t.k];$('m_'+t.k).textContent=(v==null||Number.isNaN(v))?'—':v;});
+  DERIVED_TILES.forEach(t=>{const v=b[t.k];$('d_'+t.k).textContent=(v==null||v==='')?'—':v;
+    const ne=$('need_'+t.k);if(ne)ne.textContent=(v==null)?('add '+t.need+' ↑'):'';});
 }
 
+/* ===================== HISTORY ===================== */
+function saveScan(e,b){
+  const p=activePerson(); if(p.guest) return; // guests aren't persisted
+  const h=DB.hist(); (h[p.id]=h[p.id]||[]).push({
+    ts:Date.now(),bpm:e.bpm,sdnn:e.sdnn,rmssd:e.rmssd,rr:e.rr,
+    stress:b.stress,wellness:b.wellness,q:Math.round(e.quality*100)});
+  if(h[p.id].length>60)h[p.id]=h[p.id].slice(-60);
+  DB.saveHist(h);
+}
+function renderHistory(){
+  const p=activePerson(); $('histName').textContent=p.name;
+  const list=DB.hist()[p.id]||[];
+  $('histCount').textContent=list.length?(list.length+' scan'+(list.length>1?'s':'')):'';
+  const sp=$('spark'),sc=sp.getContext('2d');sc.clearRect(0,0,sp.width,sp.height);
+  const lc=$('histList');
+  if(p.guest){lc.innerHTML='<div class="empty">Guest scans aren\'t saved. Add a person to keep history.</div>';return;}
+  if(!list.length){lc.innerHTML='<div class="empty">No scans yet — run your first scan above.</div>';return;}
+  // sparkline of bpm
+  const W=sp.width,H=sp.height,pts=list.map(s=>s.bpm).filter(Boolean);
+  if(pts.length>1){const mn=Math.min(...pts),mx=Math.max(...pts),rng=(mx-mn)||1;
+    sc.beginPath();sc.strokeStyle='#38bdf8';sc.lineWidth=2;
+    pts.forEach((v,i)=>{const x=i/(pts.length-1)*(W-8)+4,y=H-((v-mn)/rng)*(H-16)-8;i?sc.lineTo(x,y):sc.moveTo(x,y);});
+    sc.stroke();
+    pts.forEach((v,i)=>{const x=i/(pts.length-1)*(W-8)+4,y=H-((v-mn)/rng)*(H-16)-8;
+      sc.beginPath();sc.fillStyle='#38bdf8';sc.arc(x,y,2.5,0,6.3);sc.fill();});}
+  lc.innerHTML=list.slice().reverse().slice(0,10).map(s=>{
+    const d=new Date(s.ts),ds=d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+    return `<div class="hrow"><b style="color:var(--accent)">${s.bpm||'—'}</b><span class="unit">bpm</span>
+      <span class="d">${ds}</span>
+      <span class="s">stress ${s.stress??'—'} · HRV ${s.sdnn??'—'}ms</span></div>`;
+  }).join('');
+}
+
+/* ===================== SCAN FLOW ===================== */
 let beatTimer=null;
 async function start(){
   if(scanning)return;
   if(!stream){const ok=await initCamera();if(!ok)return;}
   samples=[];scanning=true;startT=performance.now();
   startBtn.textContent='Scanning…';startBtn.disabled=true;ring.classList.remove('hidden');
-  $('hr').textContent='—'; DERIVED_TILES.forEach(t=>$('m_'+t.k).textContent='—');
+  $('hr').textContent='—';MEASURED_TILES.forEach(t=>$('m_'+t.k).textContent='—');DERIVED_TILES.forEach(t=>$('d_'+t.k).textContent='—');
   beatTimer=setInterval(()=>{const hr=parseInt($('hr').textContent);if(hr){pulsedot.style.animation='ping .6s ease-out';setTimeout(()=>pulsedot.style.animation='',600);}},700);
   raf=requestAnimationFrame(loop);
 }
@@ -359,7 +527,7 @@ function finish(){
   startBtn.textContent='Scan Again';startBtn.disabled=false;oval.className='oval';
   hint.textContent='Done — results below';
   const e=estimate(samples);
-  if(e&&e.bpm){setHero(e);drawWave(e.filtered);setDerived(deriveBiomarkers(e,getProfile()));}
+  if(e&&e.bpm){const b=deriveBiomarkers(e,getProfile());setHero(e);drawWave(e.filtered);setMetrics(e,b);saveScan(e,b);renderHistory();}
   else hint.textContent='Could not lock a signal — try better lighting & stay still';
 }
 function reset(){
@@ -368,11 +536,15 @@ function reset(){
   hint.textContent='Tap Start, then fill the oval with your face';
   wctx.clearRect(0,0,wave.width,wave.height);
   $('hr').textContent='—';$('qFill').style.width='0';$('qTxt').textContent='—';
-  DERIVED_TILES.forEach(t=>$('m_'+t.k).textContent='—');
+  MEASURED_TILES.forEach(t=>$('m_'+t.k).textContent='—');DERIVED_TILES.forEach(t=>$('d_'+t.k).textContent='—');
 }
 startBtn.addEventListener('click',start);
 resetBtn.addEventListener('click',reset);
+
+/* ===================== BOOT ===================== */
 window.addEventListener('load',()=>{wave.width=wave.offsetWidth;});
+refreshPersonUI();
+if(!DB.onboarded() && DB.users().length===0) openPeople(true);
 </script>
 </body>
 </html>
