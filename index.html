@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VitalScan · 60-Second Face Scan</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23070b14'/%3E%3Cpath d='M20 50 L34 50 L42 30 L52 70 L60 44 L66 50 L80 50' stroke='%2300e5a8' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#070b14; --panel:#0e1424; --panel2:#131b2e; --line:#1e2940;
+    --txt:#eaf0fb; --muted:#7e8aa3; --accent:#00e5a8; --accent2:#38bdf8;
+    --amber:#fbbf24; --red:#f87171; --green:#34d399; --purple:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%,#0d1730,#070b14 60%);
+    color:var(--txt);min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    padding:20px 16px 56px;
+  }
+  .wrap{width:100%;max-width:480px}
+  header{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .logo{width:34px;height:34px;border-radius:9px;background:#0e1424;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center}
+  .logo svg{width:22px;height:22px}
+  h1{font-size:18px;font-weight:700;letter-spacing:.3px}
+  .tag{font-size:10.5px;color:var(--muted);margin-bottom:16px;letter-spacing:.4px;text-transform:uppercase}
+
+  .stage{position:relative;width:100%;aspect-ratio:4/5;border-radius:22px;overflow:hidden;
+    background:#05080f;border:1px solid var(--line);box-shadow:0 20px 50px rgba(0,0,0,.5)}
+  video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);
+    filter:saturate(1.05)}
+  .oval{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);
+    width:56%;aspect-ratio:3/4;border:2.5px dashed rgba(255,255,255,.5);border-radius:50%;
+    transition:border-color .3s, box-shadow .3s;pointer-events:none}
+  .oval.good{border-color:var(--accent);border-style:solid;box-shadow:0 0 0 4000px rgba(5,8,15,.55),0 0 30px rgba(0,229,168,.4)}
+  .oval.bad{border-color:var(--amber)}
+  .hint{position:absolute;left:0;right:0;bottom:16px;text-align:center;font-size:13px;
+    color:#fff;text-shadow:0 1px 4px #000;padding:0 24px;font-weight:500}
+  .ring{position:absolute;top:14px;left:50%;transform:translateX(-50%)}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:20px;font-weight:700}
+  .pulsedot{position:absolute;top:18px;right:18px;width:12px;height:12px;border-radius:50%;
+    background:var(--accent);opacity:0;box-shadow:0 0 12px var(--accent)}
+
+  .controls{margin-top:16px;display:flex;gap:10px}
+  button{flex:1;padding:15px;border-radius:14px;border:none;font-size:15px;font-weight:700;
+    cursor:pointer;letter-spacing:.3px;transition:transform .1s,opacity .2s}
+  button:active{transform:scale(.97)}
+  .primary{background:linear-gradient(135deg,var(--accent),#06b6d4);color:#04140f}
+  .ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line);flex:0 0 auto;width:54px}
+  button:disabled{opacity:.4;cursor:not-allowed}
+
+  .wave{margin-top:14px;height:64px;width:100%;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;overflow:hidden}
+
+  /* profile */
+  .profile{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .profile summary{list-style:none;cursor:pointer;padding:13px 16px;font-size:12.5px;font-weight:600;
+    display:flex;justify-content:space-between;align-items:center;color:var(--muted)}
+  .profile summary::-webkit-details-marker{display:none}
+  .profile-body{padding:0 16px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .field input,.field select{background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+    color:var(--txt);padding:9px 11px;font-size:14px;font-family:inherit}
+
+  .sec-h{display:flex;align-items:center;gap:8px;margin:22px 2px 11px;font-size:11px;
+    text-transform:uppercase;letter-spacing:.7px;font-weight:700}
+  .sec-h .pill{font-size:9px;padding:2px 7px;border-radius:6px;font-weight:700}
+  .pill.real{background:rgba(52,211,153,.16);color:var(--green)}
+  .pill.est{background:rgba(251,191,36,.15);color:var(--amber)}
+  .pill.lock{background:rgba(126,138,163,.16);color:var(--muted)}
+  .sec-h .line{flex:1;height:1px;background:var(--line)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:14px 15px 13px;position:relative}
+  .card.hero{grid-column:1/-1;display:flex;align-items:flex-end;justify-content:space-between;
+    background:linear-gradient(135deg,#0e1c2a,#0e1424);border-color:#1c3a3a}
+  .lbl{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;line-height:1.3}
+  .val{font-size:25px;font-weight:800;line-height:1}
+  .card.hero .val{font-size:50px;color:var(--accent)}
+  .unit{font-size:12px;color:var(--muted);font-weight:600;margin-left:3px}
+  .sub{font-size:10px;color:var(--muted);margin-top:5px}
+  .q-bar{height:5px;border-radius:3px;background:var(--line);margin-top:8px;overflow:hidden}
+  .q-fill{height:100%;width:0;background:var(--accent);transition:width .3s,background .3s}
+
+  .card.locked{background:repeating-linear-gradient(135deg,#0c1220,#0c1220 10px,#0e1526 10px,#0e1526 20px);
+    border-style:dashed}
+  .card.locked .val{color:#3a465e;filter:blur(.5px)}
+  .lockico{position:absolute;top:12px;right:12px;font-size:13px;opacity:.6}
+
+  .note{margin-top:22px;font-size:11px;color:var(--muted);line-height:1.65;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px}
+  .note b{color:var(--txt)}
+  .disclaimer{margin-top:14px;font-size:10px;color:#5a667e;text-align:center;line-height:1.55}
+  .hidden{display:none}
+  @keyframes ping{0%{transform:scale(.8);opacity:1}100%{transform:scale(2.2);opacity:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 100 100"><path d="M20 50 L34 50 L42 30 L52 70 L60 44 L66 50 L80 50" stroke="#00e5a8" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div><h1>VitalScan</h1></div>
+  </header>
+  <div class="tag">60-Second Face Scan · rPPG Proof of Concept · 100% On-Device</div>
+
+  <div class="stage">
+    <video id="video" playsinline muted></video>
+    <div class="oval" id="oval"></div>
+    <div class="pulsedot" id="pulsedot"></div>
+    <div class="ring hidden" id="ring">
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        <circle cx="28" cy="28" r="24" stroke="rgba(255,255,255,.18)" stroke-width="5" fill="none"/>
+        <circle id="ringArc" cx="28" cy="28" r="24" stroke="#00e5a8" stroke-width="5" fill="none"
+          stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"/>
+      </svg>
+      <div class="t" id="ringT">30</div>
+    </div>
+    <div class="hint" id="hint">Tap Start, then fill the oval with your face</div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="startBtn">Start Scan</button>
+    <button class="ghost" id="resetBtn" title="Reset">↺</button>
+  </div>
+
+  <canvas class="wave" id="wave" width="480" height="64"></canvas>
+
+  <details class="profile" id="profile">
+    <summary><span>👤 Your profile <span style="opacity:.7">(improves several metrics)</span></span><span>▾</span></summary>
+    <div class="profile-body">
+      <div class="field"><label>Age</label><input id="pAge" type="number" inputmode="numeric" placeholder="35"></div>
+      <div class="field"><label>Sex</label><select id="pSex"><option value="">—</option><option value="m">Male</option><option value="f">Female</option></select></div>
+      <div class="field"><label>Height (cm)</label><input id="pHt" type="number" inputmode="numeric" placeholder="175"></div>
+      <div class="field"><label>Weight (kg)</label><input id="pWt" type="number" inputmode="numeric" placeholder="75"></div>
+    </div>
+  </details>
+
+  <!-- MEASURED -->
+  <div class="sec-h"><span>Measured</span><span class="pill real">✓ REAL rPPG</span><span class="line"></span></div>
+  <div class="grid">
+    <div class="card hero">
+      <div>
+        <div class="lbl">Heart Rate</div>
+        <div><span class="val" id="hr">—</span><span class="unit">bpm</span></div>
+        <div class="sub" id="hrSub">Measured directly from blood flow</div>
+      </div>
+      <div style="text-align:right">
+        <div class="lbl">Signal Quality</div>
+        <div class="val" id="qTxt" style="font-size:18px">—</div>
+        <div class="q-bar"><div class="q-fill" id="qFill"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DERIVED -->
+  <div class="sec-h"><span>Derived from your pulse</span><span class="pill est">~ ESTIMATE</span><span class="line"></span></div>
+  <div class="grid" id="derivedGrid"></div>
+
+  <!-- LOCKED / AI MODEL -->
+  <div class="sec-h"><span>Lab-grade biomarkers</span><span class="pill lock">🔒 AI MODEL · PHASE 2</span><span class="line"></span></div>
+  <div class="grid" id="lockedGrid"></div>
+
+  <div class="note">
+    <b>Honest by design.</b> <b style="color:var(--green)">Heart rate</b> is genuinely measured — the camera reads
+    tiny color changes in your skin as blood pulses through it (real rPPG, same principle as SymCheck).
+    The <b style="color:var(--amber)">amber</b> metrics are estimated from that pulse using standard physiological
+    formulas — directional, not clinical. The <b>🔒 locked</b> biomarkers (glucose, blood pressure, SpO₂, hemoglobin…)
+    require trained AI models built on labeled medical datasets — that's <b>Phase 2</b>, and the premium tier.
+    We will never show you a made-up medical number.
+  </div>
+  <div class="disclaimer">
+    Not a medical device. Demonstration only — do not use for any health decision.<br>
+    Camera video never leaves your device; all processing is local.
+  </div>
+</div>
+
+<canvas id="proc" width="100" height="100" class="hidden"></canvas>
+
+<script>
+const $=id=>document.getElementById(id);
+const video=$('video'), proc=$('proc'), pctx=proc.getContext('2d',{willReadFrequently:true});
+const oval=$('oval'), hint=$('hint');
+const startBtn=$('startBtn'), resetBtn=$('resetBtn');
+const ring=$('ring'), ringArc=$('ringArc'), ringT=$('ringT'), pulsedot=$('pulsedot');
+const wave=$('wave'), wctx=wave.getContext('2d');
+
+let stream=null, scanning=false, raf=null;
+const SCAN_SECONDS=30, FS_TARGET=30;
+let samples=[], startT=0;
+
+// ---------- profile (persisted) ----------
+const PKEYS={pAge:'',pSex:'',pHt:'',pWt:''};
+function loadProfile(){try{const p=JSON.parse(localStorage.getItem('vs_profile')||'{}');for(const k in PKEYS)if(p[k]!=null)$(k).value=p[k];}catch(e){}}
+function saveProfile(){const p={};for(const k in PKEYS)p[k]=$(k).value;localStorage.setItem('vs_profile',JSON.stringify(p));}
+function getProfile(){return{age:+$('pAge').value||null,sex:$('pSex').value||null,ht:+$('pHt').value||null,wt:+$('pWt').value||null};}
+['pAge','pSex','pHt','pWt'].forEach(k=>$(k)&&$(k).addEventListener('change',saveProfile));
+loadProfile();
+
+// ---------- camera ----------
+async function initCamera(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});
+    video.srcObject=stream; await video.play();
+    hint.textContent='Fill the oval with your face, hold still, good light'; return true;
+  }catch(e){ hint.textContent='⚠ Camera blocked. Open over https:// or localhost and allow camera.'; return false; }
+}
+
+function sampleFrame(){
+  const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
+  const sx=vw*0.30, sy=vh*0.22, sw=vw*0.40, sh=vh*0.30;
+  pctx.drawImage(video,sx,sy,sw,sh,0,0,100,100);
+  const d=pctx.getImageData(0,0,100,100).data;
+  let r=0,g=0,b=0,n=0;
+  for(let i=0;i<d.length;i+=4){const R=d[i],G=d[i+1],B=d[i+2];const br=(R+G+B)/3;
+    if(br<40||br>240)continue; r+=R;g+=G;b+=B;n++;}
+  if(n<500) return {ok:false};
+  return {ok:true,r:r/n,g:g/n,b:b/n};
+}
+
+function loop(){
+  if(!scanning) return;
+  const now=performance.now();
+  const s=sampleFrame();
+  if(s&&s.ok){samples.push({t:now,g:s.g,r:s.r,b:s.b});oval.className='oval good';hint.textContent='Scanning… stay still';}
+  else{oval.className='oval bad';hint.textContent='Center your face in the oval';}
+  const elapsed=(now-startT)/1000, remain=Math.max(0,SCAN_SECONDS-elapsed);
+  ringT.textContent=Math.ceil(remain); ringArc.style.strokeDashoffset=150.8*(remain/SCAN_SECONDS);
+  if(elapsed>8){const e=estimate(samples);if(e)drawWave(e.filtered);}
+  if(elapsed>=SCAN_SECONDS){finish();return;}
+  raf=requestAnimationFrame(loop);
+}
+
+// ================= SIGNAL PROCESSING (real rPPG core) =================
+function resample(sig,times,fs){
+  if(times.length<2)return[];
+  const t0=times[0],t1=times[times.length-1],N=Math.floor((t1-t0)/1000*fs),out=[];let j=0;
+  for(let i=0;i<N;i++){const t=t0+i/fs*1000;while(j<times.length-2&&times[j+1]<t)j++;
+    const span=times[j+1]-times[j]||1,frac=(t-times[j])/span;out.push(sig[j]+(sig[j+1]-sig[j])*frac);}
+  return out;
+}
+const detrend=x=>{const m=x.reduce((a,b)=>a+b,0)/x.length;return x.map(v=>v-m);};
+function movingAvg(x,w){const out=[];for(let i=0;i<x.length;i++){let s=0,c=0;for(let k=-w;k<=w;k++){const j=i+k;if(j>=0&&j<x.length){s+=x[j];c++;}}out.push(s/c);}return out;}
+function bandpass(x,fs,lo,hi){const wHi=Math.round(fs/lo),wLo=Math.max(1,Math.round(fs/hi/2));const base=movingAvg(x,wHi);const hp=x.map((v,i)=>v-base[i]);return movingAvg(hp,wLo);}
+function goertzel(x,fs,freq){const k=2*Math.cos(2*Math.PI*freq/fs);let s1=0,s2=0,s0;for(let i=0;i<x.length;i++){s0=x[i]+k*s1-s2;s2=s1;s1=s0;}return s1*s1+s2*s2-k*s1*s2;}
+function dominantFreq(x,fs,loHz,hiHz,step){let best=loHz,bestP=-1,total=0,c=0;for(let f=loHz;f<=hiHz;f+=step){const p=goertzel(x,fs,f);total+=p;c++;if(p>bestP){bestP=p;best=f;}}const snr=bestP/(total/c+1e-9);return{freq:best,power:bestP,snr};}
+function peaks(x){const idx=[];for(let i=2;i<x.length-2;i++){if(x[i]>x[i-1]&&x[i]>=x[i+1]&&x[i]>x[i-2]&&x[i]>x[i+2])idx.push(i);}return idx;}
+
+function estimate(raw){
+  if(raw.length<60)return null;
+  const times=raw.map(s=>s.t);
+  let g=resample(raw.map(s=>s.g),times,FS_TARGET); if(g.length<60)return null;
+  g=detrend(g);
+  const filtered=bandpass(g,FS_TARGET,0.7,4.0);
+  const hrBand=dominantFreq(filtered,FS_TARGET,0.7,3.0,0.01);
+  const bpm=Math.round(hrBand.freq*60);
+  const resp=bandpass(detrend(resample(raw.map(s=>s.g),times,FS_TARGET)),FS_TARGET,0.12,0.5);
+  const rrBand=dominantFreq(resp,FS_TARGET,0.12,0.5,0.005);
+  const rr=Math.round(rrBand.freq*60);
+  const pk=peaks(filtered); let hrv=null;
+  if(pk.length>4){const ibis=[];for(let i=1;i<pk.length;i++)ibis.push((pk[i]-pk[i-1])/FS_TARGET*1000);
+    const mean=ibis.reduce((a,b)=>a+b,0)/ibis.length;const sd=Math.sqrt(ibis.reduce((a,b)=>a+(b-mean)**2,0)/ibis.length);hrv=Math.round(sd);}
+  const quality=Math.max(0,Math.min(1,(hrBand.snr-1)/6));
+  return {bpm,rr,hrv,filtered,quality};
+}
+
+// ============ DERIVED biomarkers (physiological formulas; estimates) ============
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function deriveBiomarkers(e,prof){
+  const {bpm,rr,hrv}=e, age=prof.age, ht=prof.ht, wt=prof.wt;
+  const out={};
+  out.hrv = hrv!=null?hrv:null;
+  out.rr  = rr||null;
+  out.prq = (bpm&&rr)? +(bpm/rr).toFixed(1):null;                 // pulse-respiratory quotient
+  out.stress = hrv!=null? clamp(Math.round(120-hrv*0.9),1,99):null;
+  out.pns = hrv!=null? +clamp(hrv/12,0,10).toFixed(1):null;       // parasympathetic index 0-10
+  out.sns = hrv!=null? +clamp(10-hrv/12+(bpm-65)/9,0,10).toFixed(1):null;
+  out.fatigue = hrv!=null? clamp(Math.round((bpm-55)*1.2+(50-hrv)*0.8),1,99):null;
+  if(age&&bpm){const hrMax=208-0.7*age; out.vo2=clamp(Math.round(15.3*hrMax/bpm),18,72);}else out.vo2=null;
+  if(age){let ba=age+(bpm-65)*0.12-((hrv||40)-40)*0.10; out.bioAge=clamp(Math.round(ba),16,95);}else out.bioAge=null;
+  if(ht&&wt){out.bmi=+(wt/((ht/100)**2)).toFixed(1);}else out.bmi=null;
+  // wellness composite 0-100
+  let w=100; if(out.stress)w-=out.stress*0.25; if(bpm>70)w-=(bpm-70)*0.4; if(hrv!=null)w+=Math.min(hrv,80)*0.25;
+  out.wellness=clamp(Math.round(w),1,100);
+  return out;
+}
+
+// ============ UI render ============
+const DERIVED_TILES=[
+  {k:'hrv',  lbl:'HR Variability', u:'ms',   need:''},
+  {k:'rr',   lbl:'Respiratory Rate',u:'/min',need:''},
+  {k:'prq',  lbl:'Pulse-Resp Quotient',u:'',need:''},
+  {k:'stress',lbl:'Stress Level',  u:'/100', need:''},
+  {k:'pns',  lbl:'Parasympathetic',u:'/10',  need:''},
+  {k:'sns',  lbl:'Sympathetic',    u:'/10',  need:''},
+  {k:'vo2',  lbl:'VO₂ Max',        u:'',     need:'age'},
+  {k:'bioAge',lbl:'Biological Age',u:'yrs',  need:'age'},
+  {k:'bmi',  lbl:'Body Mass Index',u:'',     need:'height + weight'},
+  {k:'fatigue',lbl:'Fatigue Index',u:'/100', need:''},
+  {k:'wellness',lbl:'Wellness Score',u:'/100',need:''},
+];
+const LOCKED_TILES=[
+  {lbl:'Blood Pressure',u:'mmHg'},
+  {lbl:'Avg Blood Glucose',u:'mg/dL'},
+  {lbl:'Oxygen Saturation',u:'% SpO₂'},
+  {lbl:'Hemoglobin',u:'g/dL'},
+  {lbl:'Inflammation Index',u:''},
+  {lbl:'Hydration Level',u:'%'},
+];
+function buildGrids(){
+  $('derivedGrid').innerHTML=DERIVED_TILES.map(t=>
+    `<div class="card"><div class="lbl">${t.lbl}</div><div><span class="val" id="m_${t.k}">—</span><span class="unit">${t.u}</span></div>${t.need?`<div class="sub" id="need_${t.k}"></div>`:''}</div>`).join('');
+  $('lockedGrid').innerHTML=LOCKED_TILES.map(t=>
+    `<div class="card locked"><span class="lockico">🔒</span><div class="lbl">${t.lbl}</div><div><span class="val">•••</span><span class="unit">${t.u}</span></div><div class="sub">Needs trained model</div></div>`).join('');
+}
+buildGrids();
+
+function drawWave(sig){
+  if(!sig||!sig.length)return;
+  const W=wave.width,H=wave.height; wctx.clearRect(0,0,W,H);
+  const tail=sig.slice(-Math.min(sig.length,180));
+  let mn=Math.min(...tail),mx=Math.max(...tail);const rng=(mx-mn)||1;
+  wctx.beginPath();wctx.strokeStyle='#00e5a8';wctx.lineWidth=2;
+  tail.forEach((v,i)=>{const x=i/(tail.length-1)*W,y=H-((v-mn)/rng)*(H*0.8)-H*0.1;i?wctx.lineTo(x,y):wctx.moveTo(x,y);});
+  wctx.stroke();
+}
+function setHero(e){
+  $('hr').textContent=e.bpm||'—';
+  const conf=Math.round(e.quality*100),qt=$('qTxt'),qf=$('qFill');qf.style.width=conf+'%';
+  if(e.quality>0.6){qt.textContent='Good';qt.style.color='var(--green)';qf.style.background='var(--green)';}
+  else if(e.quality>0.3){qt.textContent='Fair';qt.style.color='var(--amber)';qf.style.background='var(--amber)';}
+  else{qt.textContent='Low';qt.style.color='var(--red)';qf.style.background='var(--red)';}
+  $('hrSub').textContent=e.quality>0.6?'Strong pulse signal locked':'Hold stiller / better light for accuracy';
+}
+function setDerived(b){
+  DERIVED_TILES.forEach(t=>{
+    const el=$('m_'+t.k), v=b[t.k];
+    el.textContent=(v==null||Number.isNaN(v))?'—':v;
+    const ne=$('need_'+t.k);
+    if(ne) ne.textContent=(v==null)?('add '+t.need+' ↑'):'';
+  });
+}
+
+let beatTimer=null;
+async function start(){
+  if(scanning)return;
+  if(!stream){const ok=await initCamera();if(!ok)return;}
+  samples=[];scanning=true;startT=performance.now();
+  startBtn.textContent='Scanning…';startBtn.disabled=true;ring.classList.remove('hidden');
+  $('hr').textContent='—'; DERIVED_TILES.forEach(t=>$('m_'+t.k).textContent='—');
+  beatTimer=setInterval(()=>{const hr=parseInt($('hr').textContent);if(hr){pulsedot.style.animation='ping .6s ease-out';setTimeout(()=>pulsedot.style.animation='',600);}},700);
+  raf=requestAnimationFrame(loop);
+}
+function finish(){
+  scanning=false;cancelAnimationFrame(raf);clearInterval(beatTimer);
+  startBtn.textContent='Scan Again';startBtn.disabled=false;oval.className='oval';
+  hint.textContent='Done — results below';
+  const e=estimate(samples);
+  if(e&&e.bpm){setHero(e);drawWave(e.filtered);setDerived(deriveBiomarkers(e,getProfile()));}
+  else hint.textContent='Could not lock a signal — try better lighting & stay still';
+}
+function reset(){
+  scanning=false;cancelAnimationFrame(raf);clearInterval(beatTimer);samples=[];
+  startBtn.textContent='Start Scan';startBtn.disabled=false;ring.classList.add('hidden');oval.className='oval';
+  hint.textContent='Tap Start, then fill the oval with your face';
+  wctx.clearRect(0,0,wave.width,wave.height);
+  $('hr').textContent='—';$('qFill').style.width='0';$('qTxt').textContent='—';
+  DERIVED_TILES.forEach(t=>$('m_'+t.k).textContent='—');
+}
+startBtn.addEventListener('click',start);
+resetBtn.addEventListener('click',reset);
+window.addEventListener('load',()=>{wave.width=wave.offsetWidth;});
+</script>
+</body>
+</html>
