@@ -168,6 +168,25 @@
   .wscore{font-size:44px;font-weight:800;line-height:.9;margin-top:-54px}
   .wstatus{font-size:15px;font-weight:700;margin-top:8px;color:var(--muted)}
   .whint{font-size:10.5px;color:var(--muted);margin-top:12px;opacity:.85}
+
+  /* always-visible scale legend */
+  .legend{display:flex;flex-wrap:wrap;gap:7px 10px;margin-top:8px;font-size:9.5px;color:var(--muted)}
+  .legend .lg{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+  .legend .lg i{width:7px;height:7px;border-radius:50%;display:inline-block;flex:0 0 auto}
+
+  /* scan summary */
+  .summary-card{background:var(--panel);border-color:var(--line);text-align:left;padding:15px 16px}
+  .summary-text{font-size:13px;line-height:1.6;color:var(--txt);margin-top:7px}
+  .summary-text b{color:#fff}
+
+  /* locked Phase-2 lab tiles */
+  .pill.lock{background:rgba(126,138,163,.16);color:var(--muted)}
+  .card.locked{background:repeating-linear-gradient(135deg,#0c1220,#0c1220 9px,#0e1526 9px,#0e1526 18px);
+    border-style:dashed;border-color:#243049}
+  .card.locked .val{color:#3a465e}
+  .card.locked .lbl{color:#65728c}
+  .lockico{position:absolute;top:12px;right:12px;font-size:13px;opacity:.55}
+  .lock-note{font-size:10px;color:var(--muted);line-height:1.5}
 </style>
 </head>
 <body>
@@ -234,6 +253,12 @@
     <div class="whint">Tap any metric below to learn what it means</div>
   </div>
 
+  <!-- Plain-language scan summary -->
+  <div class="card summary-card" id="summaryCard">
+    <div class="wlabel" style="text-align:left">Your scan summary</div>
+    <div id="summaryText" class="summary-text">Run a scan to see how you're doing.</div>
+  </div>
+
   <div class="sec-h"><span>Measured from your pulse</span><span class="pill real">✓ REAL rPPG</span><span class="line"></span></div>
   <div class="grid">
     <div class="card hero">
@@ -251,6 +276,7 @@
       </div>
       <div class="gauge" id="g_hero_bpm" style="margin-top:14px"><i class="gm" id="gm_hero_bpm"></i></div>
       <div class="m-ends"><span id="ge0_hero_bpm"></span><span id="ge1_hero_bpm"></span></div>
+      <div class="legend" id="lg_hero_bpm"></div>
     </div>
   </div>
   <div class="grid" id="measuredGrid" style="margin-top:11px"></div>
@@ -263,6 +289,10 @@
 
   <div class="sec-h"><span>Derived insights</span><span class="pill est">~ ESTIMATE</span><span class="line"></span></div>
   <div class="grid" id="derivedGrid"></div>
+
+  <div class="sec-h"><span>Lab biomarkers</span><span class="pill lock">🔒 PHASE 2 · NEEDS AI MODEL</span><span class="line"></span></div>
+  <div class="grid" id="labGrid"></div>
+  <div class="lock-note" style="margin-top:10px">These can't be measured from a camera with signal processing alone — they need AI models trained on labeled medical data. Coming in Phase 2. We will never show an estimated number dressed up as a real lab result.</div>
 
   <div class="sec-h"><span>Scan history</span><span class="line"></span></div>
   <div class="hist">
@@ -554,11 +584,12 @@ function deriveBiomarkers(e,prof){
   const {bpm,rr,sdnn,rmssd}=e, age=prof.age, ht=prof.ht, wt=prof.wt, hrv=sdnn;
   const o={};
   o.prq=(bpm&&rr)?+(bpm/rr).toFixed(1):null;
-  o.stress=hrv!=null?clamp(Math.round(90-hrv),1,99):null;
+  // stress from RMSSD (the recovery-linked HRV metric), bounded to a realistic 12–92 band
+  o.stress=(rmssd!=null)?clamp(Math.round(88-rmssd),12,92):(hrv!=null?clamp(Math.round(95-hrv),12,92):null);
   o.pns=(rmssd!=null)?+clamp(rmssd/10,0,10).toFixed(1):(hrv!=null?+clamp(hrv/12,0,10).toFixed(1):null);
   o.sns=hrv!=null?+clamp(10-hrv/12+(bpm-65)/9,0,10).toFixed(1):null;
   o.ans=(o.pns!=null&&o.sns!=null)?(o.pns>=o.sns?'Recovery':'Activated'):null;
-  o.fatigue=hrv!=null?clamp(Math.round((bpm-55)*1.2+(50-hrv)*0.8),1,99):null;
+  o.fatigue=hrv!=null?clamp(Math.round((bpm-55)*1.0+(45-hrv)*0.7),5,95):null;
   if(age&&bpm){const hrMax=208-0.7*age;o.vo2=clamp(Math.round(15.3*hrMax/bpm),18,72);}else o.vo2=null;
   if(age){let ba=age+(bpm-65)*0.12-((hrv||40)-40)*0.10;o.bioAge=clamp(Math.round(ba),16,95);}else o.bioAge=null;
   o.bmi=(ht&&wt)?+(wt/((ht/100)**2)).toFixed(1):null;
@@ -627,6 +658,18 @@ function gradFor(R){const span=(R.max-R.min)||1;let prev=R.min,parts=[];
   R.zones.forEach(z=>{const up=Math.min(z[0],R.max);const a=(prev-R.min)/span*100,b=(up-R.min)/span*100;
     parts.push(COL[z[1]]+' '+a.toFixed(1)+'%',COL[z[1]]+' '+b.toFixed(1)+'%');prev=up;});
   return 'linear-gradient(90deg,'+parts.join(',')+')';}
+const fmt=n=>(n==null)?'':(Number.isInteger(n)?n:(+n).toFixed(1));
+// build an always-visible legend showing the healthy band + what counts as low/high
+function legendFor(k){const R=RANGES[k];if(!R||!R.zones)return'';
+  let hLo=null,hHi=null;const segs=R.zones.map((z,i)=>({lo:i===0?R.min:R.zones[i-1][0],hi:Math.min(z[0],R.max),c:z[1],l:z[2]}));
+  segs.forEach(s=>{if(s.c==='green'||s.c==='teal'){if(hLo==null)hLo=s.lo;hHi=s.hi;}});
+  const dot=c=>`<span class="lg"><i style="background:${COL[c]}"></i>`;
+  const out=[];
+  if(hLo!=null){const r=(hHi>=R.max)?('≥'+fmt(hLo)):(fmt(hLo)+'–'+fmt(hHi));out.push(dot('green')+'Healthy '+r+'</span>');}
+  const first=segs[0],last=segs[segs.length-1];
+  if((last.c==='red'||last.c==='amber'))out.push(dot(last.c)+'High &gt;'+fmt(last.lo)+'</span>');
+  if((first.c==='red'||first.c==='amber')&&first!==last)out.push(dot(first.c)+'Low &lt;'+fmt(first.hi)+'</span>');
+  return out.join('');}
 function classify(k,value,profile){
   const R=RANGES[k];
   if(k==='ans'){const rec=value==='Recovery';return{pct:rec?78:28,color:rec?'green':'amber',label:value};}
@@ -657,19 +700,30 @@ function tileHTML(p,t){
     <div><span class="val" id="${p}_${t.k}">—</span><span class="unit">${t.u}</span></div>
     <div class="gauge" id="g_${id}"><i class="gm" id="gm_${id}"></i></div>
     <div class="m-ends"><span id="ge0_${id}"></span><span id="ge1_${id}"></span></div>
+    <div class="legend" id="lg_${id}"></div>
     <div class="m-info" id="info_${id}"></div>
     ${t.need?`<div class="sub" id="need_${id}"></div>`:''}</div>`;
 }
 function buildGrids(){
   $('measuredGrid').innerHTML=MEASURED_TILES.map(t=>tileHTML('m',t)).join('');
   $('derivedGrid').innerHTML=DERIVED_TILES.map(t=>tileHTML('d',t)).join('');
-  // seed info text + tap to expand explanation
-  MEASURED_TILES.forEach(t=>{const i=$('info_m_'+t.k);if(i&&RANGES[t.k])i.textContent=RANGES[t.k].info;});
-  DERIVED_TILES.forEach(t=>{const i=$('info_d_'+t.k);if(i&&RANGES[t.k])i.textContent=RANGES[t.k].info;});
+  // seed info text + always-visible scale legend + tap to expand explanation
+  MEASURED_TILES.forEach(t=>{const i=$('info_m_'+t.k);if(i&&RANGES[t.k])i.textContent=RANGES[t.k].info;const l=$('lg_m_'+t.k);if(l)l.innerHTML=legendFor(t.k);});
+  DERIVED_TILES.forEach(t=>{const i=$('info_d_'+t.k);if(i&&RANGES[t.k])i.textContent=RANGES[t.k].info;const l=$('lg_d_'+t.k);if(l)l.innerHTML=legendFor(t.k);});
+  const hl=$('lg_hero_bpm');if(hl)hl.innerHTML=legendFor('bpm');
   document.querySelectorAll('.metric').forEach(c=>c.addEventListener('click',()=>{
     const inf=c.querySelector('.m-info');if(inf)inf.classList.toggle('show');}));
 }
 buildGrids();
+const LAB_TILES=[
+  {lbl:'Avg Blood Glucose / A1C',u:'mg/dL · %'},{lbl:'Blood Pressure',u:'mmHg'},
+  {lbl:'Oxygen Saturation',u:'% SpO₂'},{lbl:'Hemoglobin',u:'g/dL'},
+];
+function buildLab(){$('labGrid').innerHTML=LAB_TILES.map(t=>
+  `<div class="card locked"><span class="lockico">🔒</span><div class="lbl">${t.lbl}</div>
+   <div><span class="val">•••</span><span class="unit">${t.u}</span></div>
+   <div class="lock-note">Needs trained model</div></div>`).join('');}
+buildLab();
 
 let _lastWell=0;
 function wmarkPos(score){const a=Math.PI*(1-clamp(score,0,100)/100);return{x:110+88*Math.cos(a),y:110-88*Math.sin(a)};}
@@ -683,6 +737,24 @@ function renderWellness(score){
   (function step(t){const k=Math.min(1,(t-t0)/750),cur=from+(score-from)*k;
     el.textContent=Math.round(cur);const p=wmarkPos(cur);mk.setAttribute('cx',p.x);mk.setAttribute('cy',p.y);mk.setAttribute('fill',COL[s[1]]);
     if(k<1)requestAnimationFrame(step);else _lastWell=score;})(t0);
+}
+function renderSummary(e,b){
+  const el=$('summaryText'); if(!el)return;
+  const prof=getProfile();
+  const defs=[['heart rate','bpm',e.bpm],['HRV','sdnn',e.sdnn],['recovery','rmssd',e.rmssd],
+    ['breathing','rr',e.rr],['stress','stress',b.stress],['fatigue','fatigue',b.fatigue]];
+  if(prof.age)defs.push(['fitness (VO₂)','vo2',b.vo2],['biological age','bioAge',b.bioAge]);
+  if(prof.ht&&prof.wt)defs.push(['BMI','bmi',b.bmi]);
+  const good=[],watch=[];
+  defs.forEach(([nm,k,v])=>{if(v==null)return;const c=classify(k,v,prof);
+    (c.color==='green'||c.color==='teal'?good:watch).push(c.color==='red'?nm+' ('+c.label.toLowerCase()+')':nm);});
+  const w=b.wellness, band=w>=85?'excellent':w>=70?'good':w>=55?'fair':w>=40?'below average':'low';
+  let html=`<b>Overall wellness ${w} — ${band}.</b> `;
+  if(good.length)html+=`Looking healthy: ${good.slice(0,4).join(', ')}. `;
+  if(watch.length)html+=`<span style="color:var(--amber)">Worth attention: ${watch.slice(0,3).join(', ')}.</span> `;
+  else if(good.length)html+=`Everything measured sits in a healthy range — nice work. `;
+  if(e.quality<0.35)html+=`<br><span style="color:var(--red)">⚠ Signal quality was low this scan — lighting or movement may have skewed the numbers. Rescan in steady, bright light for reliable results.</span>`;
+  el.innerHTML=html;
 }
 
 function drawWave(sig){
@@ -709,6 +781,7 @@ function setMetrics(e,b){
   DERIVED_TILES.forEach(t=>{const v=b[t.k];$('d_'+t.k).textContent=(v==null||v==='')?'—':v;paintMetric('d',t.k,v,prof);
     const ne=$('need_d_'+t.k);if(ne)ne.textContent=(v==null)?('add '+t.need+' ↑'):'';});
   renderWellness(b.wellness);
+  renderSummary(e,b);
 }
 
 /* ===================== HISTORY + EXPORT (Track 3) ===================== */
@@ -811,6 +884,7 @@ function reset(){
   MEASURED_TILES.forEach(t=>{$('m_'+t.k).textContent='—';paintMetric('m',t.k,null,null);});
   DERIVED_TILES.forEach(t=>{$('d_'+t.k).textContent='—';paintMetric('d',t.k,null,null);});
   renderWellness(null);
+  if($('summaryText'))$('summaryText').textContent="Run a scan to see how you're doing.";
 }
 startBtn.addEventListener('click',start);
 resetBtn.addEventListener('click',reset);
