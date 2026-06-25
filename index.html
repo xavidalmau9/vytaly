@@ -497,23 +497,55 @@ function isSkin(R,G,B){
   // tightened + require R>G>~B (true skin) to reject warm background false-positives
   return y>60 && y<215 && cr>=137 && cr<=172 && cb>=80 && cb<=125 && R>G && G>=B*0.85;
 }
+// ---- MediaPipe face detection (real distance/positioning) ----
+let faceDetector=null;
+async function initFaceDetector(){
+  try{
+    const V='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12';
+    const vision=await import(V);
+    const fs=await vision.FilesetResolver.forVisionTasks(V+'/wasm');
+    const make=d=>vision.FaceDetector.createFromOptions(fs,{
+      baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',delegate:d},
+      runningMode:'VIDEO', minDetectionConfidence:0.5});
+    try{faceDetector=await make('GPU');}catch(e){faceDetector=await make('CPU');}
+  }catch(e){ faceDetector=null; }  // fall back to skin-coverage method
+}
+
 let prevMean=null;
-function sampleFrame(){
-  const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
-  // wider ROI to cover forehead + cheeks; skin segmentation isolates the face
-  const sx=vw*0.26, sy=vh*0.16, sw=vw*0.48, sh=vh*0.46;
-  pctx.drawImage(video,sx,sy,sw,sh,0,0,120,120);
+function roiMeans(minPix){
   const d=pctx.getImageData(0,0,120,120).data;
   let r=0,g=0,b=0,n=0,total=0;
   for(let i=0;i<d.length;i+=4){total++;const R=d[i],G=d[i+1],B=d[i+2];
     if(isSkin(R,G,B)){r+=R;g+=G;b+=B;n++;}}
   const skinFrac=n/total;
-  if(n<800||skinFrac<0.10) return {ok:false,skinFrac};
+  if(n<(minPix||500)) return {ok:false,skinFrac};
   const gm=g/n, motion=prevMean==null?0:Math.abs(gm-prevMean); prevMean=gm;
-  const bright=(r/n+g/n+b/n)/3;
-  return {ok:true,r:r/n,g:gm,b:b/n,skinFrac,motion,bright};
+  return {ok:true,r:r/n,g:gm,b:b/n,skinFrac,motion,bright:(r/n+g/n+b/n)/3};
 }
-// real-time positioning guidance shown during a scan
+// fallback ROI (no face detector available): fixed central band
+function sampleFrame(){
+  const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
+  pctx.drawImage(video,vw*0.26,vh*0.16,vw*0.48,vh*0.46,0,0,120,120);
+  const m=roiMeans(800); if(m.ok&&m.skinFrac<0.10)return {ok:false,skinFrac:m.skinFrac}; return m;
+}
+// forehead ROI from a detected face box — tracks the face, cleaner pulse
+function sampleForehead(box){
+  const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
+  const fx=box.originX+box.width*0.25, fy=box.originY+box.height*0.06, fw=box.width*0.50, fh=box.height*0.26;
+  pctx.drawImage(video,Math.max(0,fx),Math.max(0,fy),Math.max(2,fw),Math.max(2,fh),0,0,120,120);
+  return roiMeans(400);
+}
+// guidance from a real face bounding box (distance + centering)
+function guideFace(box){
+  if(!box) return {ok:false,msg:'No face detected — center your face'};
+  const vw=video.videoWidth, vh=video.videoHeight;
+  const fh=box.height/vh, cx=(box.originX+box.width/2)/vw, cy=(box.originY+box.height/2)/vh;
+  if(fh<0.32) return {ok:false,msg:'Move closer'};
+  if(fh>0.70) return {ok:false,msg:'Move back a little'};
+  if(cx<0.30||cx>0.70||cy<0.24||cy>0.80) return {ok:false,msg:'Center your face in the oval'};
+  return {ok:true,msg:''};
+}
+// guidance for the fallback (no detector) path
 function guide(s){
   if(!s||!s.ok) return {ok:false,msg:'Center your face in the oval'};
   if(s.skinFrac<0.22) return {ok:false,msg:'Move closer — fill the oval'};
@@ -526,8 +558,22 @@ function guide(s){
 function loop(){
   if(!scanning) return;
   const now=performance.now();
-  const s=sampleFrame();
-  const gd=guide(s);
+  let s=null, gd;
+  if(faceDetector && video.videoWidth){
+    let box=null;
+    try{const det=faceDetector.detectForVideo(video,now);
+      if(det&&det.detections&&det.detections.length)box=det.detections[0].boundingBox;}catch(e){box=null;}
+    gd=guideFace(box);
+    s=box?sampleForehead(box):null;
+    if(gd.ok&&s){            // face well-placed — now check skin/light/motion
+      if(!s.ok)              gd={ok:false,msg:'Center your face in the oval'};
+      else if(s.bright<72)   gd={ok:false,msg:'Find brighter light'};
+      else if(s.bright>216)  gd={ok:false,msg:'Too bright — reduce glare'};
+      else if(s.motion>2.6)  gd={ok:false,msg:'Hold still'};
+    }
+  } else {
+    s=sampleFrame(); gd=guide(s);
+  }
   oval.className='oval '+(gd.ok?'good':'bad');
   if(phase==='align'){
     hint.textContent=gd.ok?'Hold there… starting':gd.msg;
@@ -1010,7 +1056,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 /* ===================== BOOT + PWA ===================== */
-window.addEventListener('load',()=>{wave.width=wave.offsetWidth;});
+window.addEventListener('load',()=>{wave.width=wave.offsetWidth; initFaceDetector();});
 $('refbox').classList.add('hidden');
 refreshPersonUI();
 if(!DB.consented()) $('consentOv').classList.remove('hidden'); else maybeOnboard();

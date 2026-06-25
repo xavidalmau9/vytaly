@@ -1,5 +1,5 @@
 // Vytaly service worker — offline app shell
-const CACHE = 'vytaly-v10';
+const CACHE = 'vytaly-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -17,6 +17,8 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // never intercept cross-origin (e.g. the MediaPipe CDN / model files) — let the browser handle it
+  if (new URL(e.request.url).origin !== location.origin) return;
   const isHTML = e.request.mode === 'navigate' ||
     (e.request.headers.get('accept') || '').includes('text/html');
   if (isHTML) {
