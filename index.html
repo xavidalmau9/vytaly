@@ -400,8 +400,8 @@
 const $=id=>document.getElementById(id);
 const APP_VER='vytaly-poc/0.6';
 // ===== Data contribution (opt-in) — paste your deployed Apps Script values to enable =====
-const UPLOAD_URL='';   // ← your Apps Script web-app /exec URL
-const WRITE_KEY='';    // ← the WRITE_KEY you set in the Apps Script
+const UPLOAD_URL='https://script.google.com/macros/s/AKfycbzqlsw6Qtr3ZgX55jdJ2jWO8B81pT9jyjoOJxGDffAwlhIF1QU6teKBHf6EvqDSUNA/exec';
+const WRITE_KEY='vytaly-w-94a3bfaeb4bedce3c7e4927f';
 function contributing(){return localStorage.getItem('vs_contribute')==='1';}
 function syncContributeToggle(){const sw=document.getElementById('contribSw');if(sw)sw.classList.toggle('on',contributing());}
 const video=$('video'), proc=$('proc'), pctx=proc.getContext('2d',{willReadFrequently:true});
