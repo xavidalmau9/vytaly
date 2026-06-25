@@ -187,6 +187,9 @@
   .card.locked .lbl{color:#65728c}
   .lockico{position:absolute;top:12px;right:12px;font-size:13px;opacity:.55}
   .lock-note{font-size:10px;color:var(--muted);line-height:1.5}
+  .bp-note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:8px}
+  .bp-note b{color:var(--txt)}
+  #bpVal{font-size:34px;font-weight:800}
 </style>
 </head>
 <body>
@@ -280,6 +283,23 @@
     </div>
   </div>
   <div class="grid" id="measuredGrid" style="margin-top:11px"></div>
+
+  <!-- Blood Pressure (experimental, calibrated) -->
+  <div class="sec-h"><span>Blood pressure</span><span class="pill est">~ EXPERIMENTAL · CALIBRATED</span><span class="line"></span></div>
+  <div class="card" id="bpCard">
+    <div class="m-top"><span class="lbl">Blood Pressure</span><span class="status" id="bpStatus"></span></div>
+    <div><span class="val" id="bpVal">—</span><span class="unit" id="bpUnit">mmHg</span></div>
+    <div class="bp-note" id="bpNote">Calibrate once with a real cuff reading to enable trend estimates.</div>
+    <div id="bpActions" style="margin-top:11px"><button class="primary" id="bpCalBtn" style="padding:11px;font-size:13px">Calibrate with a cuff reading</button></div>
+    <div id="bpCalForm" class="hidden" style="margin-top:11px">
+      <div class="pbody" style="padding:0">
+        <div class="field"><label>Cuff Systolic</label><input id="bpSys" type="number" inputmode="numeric" placeholder="120"></div>
+        <div class="field"><label>Cuff Diastolic</label><input id="bpDia" type="number" inputmode="numeric" placeholder="80"></div>
+      </div>
+      <div class="ovbtns"><button class="ghost" id="bpCancel" style="flex:1">Cancel</button><button class="primary" id="bpSaveCal">Save calibration</button></div>
+      <div class="bp-note" style="margin-top:8px">Enter a reading from a real arm cuff taken right after this scan — we anchor your trend to it. Re-calibrate monthly for accuracy.</div>
+    </div>
+  </div>
 
   <div class="refbox" id="refbox">
     <span id="refMsg">📏 Check accuracy — enter a reference HR from a watch/oximeter:</span>
@@ -422,6 +442,7 @@ function refreshPersonUI(){
   const st=p.guest?0:streakFor(p.id);
   $('whoStreak').textContent=st>0?('🔥 '+st):'';
   renderHistory();
+  if(typeof renderBP==='function')renderBP();
 }
 function getProfile(){const p=activePerson();return{age:+($('pAge').value||p.age)||null,sex:$('pSex').value||p.sex||null,ht:+($('pHt').value||p.ht)||null,wt:+($('pWt').value||p.wt)||null};}
 function persistProfileEdits(){
@@ -447,7 +468,7 @@ function openPeople(){
   list.querySelectorAll('.person').forEach(el=>el.onclick=()=>selectPerson(el.dataset.id));
 }
 function closePeople(){$('peopleOv').classList.add('hidden');}
-function selectPerson(id){DB.setActive(id);DB.setOnboarded();closePeople();refreshPersonUI();}
+function selectPerson(id){lastScanFeat=null;DB.setActive(id);DB.setOnboarded();closePeople();refreshPersonUI();}
 $('whoChip').onclick=openPeople;
 $('guestRow').onclick=()=>selectPerson('guest');
 $('addPersonBtn').onclick=()=>{$('peopleView').classList.add('hidden');$('addView').classList.remove('hidden');};
@@ -599,8 +620,17 @@ function estimate(raw){
       rmssd=Math.round(Math.sqrt(sq/(f.length-1))); pnn50=Math.round(nn/(f.length-1)*100);
     }
   }
+  // pulse-wave morphology: mean rise fraction (foot→peak vs full beat) — a real stiffness/BP-related feature
+  let riseFrac=null;
+  if(pk.length>3){const rs=[];
+    for(let i=1;i<pk.length-1;i++){const a=pk[i-1],p=pk[i],b=pk[i+1];
+      let t0=a,mn0=pulse[a];for(let j=a;j<=p;j++)if(pulse[j]<mn0){mn0=pulse[j];t0=j;}
+      let t1=p,mn1=pulse[p];for(let j=p;j<=b;j++)if(pulse[j]<mn1){mn1=pulse[j];t1=j;}
+      const rise=p-t0,fall=t1-p,tot=rise+fall;
+      if(tot>2&&rise>0&&fall>0)rs.push(rise/tot);}
+    if(rs.length)riseFrac=+(rs.reduce((x,y)=>x+y,0)/rs.length).toFixed(3);}
   const quality=Math.max(0,Math.min(1,(hrBand.snr-1)/6));
-  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,pulse,quality,
+  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,riseFrac,pulse,quality,
     fps:Math.round(G.length/((times[times.length-1]-times[0])/1000)),frames:raw.length};
 }
 
@@ -742,7 +772,7 @@ function buildGrids(){
 }
 buildGrids();
 const LAB_TILES=[
-  {lbl:'Avg Blood Glucose / A1C',u:'mg/dL · %'},{lbl:'Blood Pressure',u:'mmHg'},
+  {lbl:'Avg Blood Glucose / A1C',u:'mg/dL · %'},
   {lbl:'Oxygen Saturation',u:'% SpO₂'},{lbl:'Hemoglobin',u:'g/dL'},
 ];
 function buildLab(){$('labGrid').innerHTML=LAB_TILES.map(t=>
@@ -782,6 +812,50 @@ function renderSummary(e,b){
   if(e.quality<0.35)html+=`<br><span style="color:var(--red)">⚠ Signal quality was low this scan — lighting or movement may have skewed the numbers. Rescan in steady, bright light for reliable results.</span>`;
   el.innerHTML=html;
 }
+
+/* ===================== BLOOD PRESSURE (experimental, calibrated) ===================== */
+let guestBP=null, lastScanFeat=null;
+function getBPCal(){const p=activePerson();if(p.guest)return guestBP;const u=DB.users().find(x=>x.id===p.id);return (u&&u.bp)||null;}
+function setBPCal(cal){const p=activePerson();if(p.guest){guestBP=cal;return;}const users=DB.users();const u=users.find(x=>x.id===p.id);if(u){u.bp=cal;DB.saveUsers(users);}}
+function estimateBP(feat,cal){
+  if(!cal||!feat||feat.hr==null)return null;
+  const dHR=feat.hr-cal.hr0, dRF=(feat.rf!=null&&cal.rf0!=null)?(feat.rf-cal.rf0):0;
+  let sbp=Math.round(cal.sbp0+0.5*dHR+60*dRF), dbp=Math.round(cal.dbp0+0.30*dHR+30*dRF);
+  sbp=clamp(sbp,85,205);dbp=clamp(dbp,50,125);if(sbp<dbp+20)sbp=dbp+20;
+  return {sbp,dbp};
+}
+function bpCat(sbp,dbp){if(sbp>=140||dbp>=90)return['High','red'];if(sbp>=130||dbp>=80)return['Stage 1','amber'];if(sbp>=120)return['Elevated','amber'];return['Normal','green'];}
+function calDate(cal){try{return new Date(cal.ts).toLocaleDateString(undefined,{month:'short',day:'numeric'});}catch(e){return'';}}
+function openBPForm(){const cal=getBPCal();if(cal){$('bpSys').value=cal.sbp0;$('bpDia').value=cal.dbp0;}$('bpCalForm').classList.remove('hidden');$('bpActions').classList.add('hidden');}
+function closeBPForm(){$('bpCalForm').classList.add('hidden');$('bpActions').classList.remove('hidden');}
+function saveBPCal(){
+  const sys=+$('bpSys').value,dia=+$('bpDia').value;
+  if(!sys||!dia||sys<70||sys>250||dia<40||dia>160){alert('Enter a valid cuff reading (e.g. 120 / 80).');return;}
+  if(sys<=dia){alert('Systolic (top number) should be higher than diastolic.');return;}
+  if(!lastScanFeat){alert('Run a scan first, then enter the cuff reading you took right after it.');return;}
+  setBPCal({sbp0:sys,dbp0:dia,hr0:lastScanFeat.hr,rf0:lastScanFeat.rf,ts:Date.now()});
+  closeBPForm();renderBP();
+}
+function renderBP(){
+  const cal=getBPCal(),feat=lastScanFeat;
+  const val=$('bpVal'),unit=$('bpUnit'),note=$('bpNote'),st=$('bpStatus'),btn=$('bpCalBtn');
+  if(!val)return;
+  if(!cal){
+    val.textContent='—';unit.textContent='mmHg';
+    st.textContent='Not calibrated';st.style.color='var(--muted)';st.style.background='transparent';
+    note.textContent=feat?'Calibrate once with a real cuff reading to enable trend estimates.':'Run a scan, then calibrate with a real cuff reading.';
+    btn.textContent='Calibrate with a cuff reading';return;
+  }
+  btn.textContent='Re-calibrate';
+  if(!feat){val.textContent=cal.sbp0+' / '+cal.dbp0;unit.textContent='mmHg';
+    st.textContent='Baseline';st.style.color='var(--muted)';st.style.background='transparent';
+    note.innerHTML='Calibrated '+calDate(cal)+' · run a scan to estimate your current trend.';return;}
+  const bp=estimateBP(feat,cal);
+  val.textContent=bp.sbp+' / '+bp.dbp;unit.textContent='mmHg';
+  const c=bpCat(bp.sbp,bp.dbp);st.textContent=c[0];st.style.color=COL[c[1]];st.style.background=COL[c[1]]+'22';
+  note.innerHTML='Experimental · calibrated '+calDate(cal)+' · tracks trend, <b>not for medical decisions</b>.';
+}
+$('bpCalBtn').onclick=openBPForm;$('bpCancel').onclick=closeBPForm;$('bpSaveCal').onclick=saveBPCal;
 
 function drawWave(sig){
   if(!sig||!sig.length)return;
@@ -896,7 +970,10 @@ function finish(){
   const e=estimate(samples);
   if(e&&e.bpm){const prof=getProfile(),b=deriveBiomarkers(e,prof);
     setHero(e);drawWave(e.pulse);setMetrics(e,b);
-    lastRecord=buildRecord(e,b,prof);saveScan(lastRecord);
+    lastScanFeat={hr:e.bpm,rf:e.riseFrac};
+    lastRecord=buildRecord(e,b,prof);
+    const _cal=getBPCal();if(_cal)lastRecord.bp=estimateBP(lastScanFeat,_cal);
+    saveScan(lastRecord);renderBP();
     $('refMsg').textContent='📏 Check accuracy — enter a reference HR from a watch/oximeter:';
     $('refInput').value='';$('refInput').classList.remove('hidden');$('refSave').classList.remove('hidden');
     $('refbox').classList.remove('hidden');
@@ -917,6 +994,7 @@ function reset(){
   MEASURED_TILES.forEach(t=>{$('m_'+t.k).textContent='—';paintMetric('m',t.k,null,null);});
   DERIVED_TILES.forEach(t=>{$('d_'+t.k).textContent='—';paintMetric('d',t.k,null,null);});
   renderWellness(null);
+  lastScanFeat=null;renderBP();
   if($('summaryText'))$('summaryText').textContent="Run a scan to see how you're doing.";
 }
 startBtn.addEventListener('click',start);
