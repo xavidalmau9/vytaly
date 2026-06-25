@@ -204,7 +204,7 @@
     <div class="chev">▾</div>
   </div>
 
-  <div class="stage">
+  <div class="stage" id="stage">
     <video id="video" playsinline muted></video>
     <div class="oval" id="oval"></div>
     <div class="pulsedot" id="pulsedot"></div>
@@ -473,7 +473,8 @@ async function initCamera(){
 function isSkin(R,G,B){
   const y=0.299*R+0.587*G+0.114*B;
   const cr=(R-y)*0.713+128, cb=(B-y)*0.564+128;
-  return y>50 && y<230 && cr>=133 && cr<=173 && cb>=77 && cb<=127;
+  // tightened + require R>G>~B (true skin) to reject warm background false-positives
+  return y>60 && y<215 && cr>=137 && cr<=172 && cb>=80 && cb<=125 && R>G && G>=B*0.85;
 }
 let prevMean=null;
 function sampleFrame(){
@@ -493,10 +494,8 @@ function sampleFrame(){
 }
 // real-time positioning guidance shown during a scan
 function guide(s){
-  if(!s||!s.ok){const sf=s?s.skinFrac:0;
-    return {ok:false,msg:sf<0.05?'Move closer — fill the oval':'Center your face in the oval'};}
-  if(s.skinFrac>0.82) return {ok:false,msg:'Move back a little'};
-  if(s.skinFrac<0.16) return {ok:false,msg:'Move a bit closer'};
+  if(!s||!s.ok) return {ok:false,msg:'Center your face in the oval'};
+  if(s.skinFrac<0.22) return {ok:false,msg:'Move closer — fill the oval'};
   if(s.bright<72)     return {ok:false,msg:'Find brighter light'};
   if(s.bright>216)    return {ok:false,msg:'Too bright — reduce glare'};
   if(s.motion>2.4)    return {ok:false,msg:'Hold still'};
@@ -880,6 +879,7 @@ async function start(){
   if(scanning)return;
   if(!DB.consented()){$('consentOv').classList.remove('hidden');return;}
   startBtn.textContent='Starting…';startBtn.disabled=true;
+  $('stage').classList.remove('hidden');wave.classList.remove('hidden');resetBtn.classList.remove('hidden');
   if(!stream){const ok=await initCamera();if(!ok){startBtn.textContent='Start Scan';startBtn.disabled=false;return;}}
   samples=[];prevMean=null;scanning=true;phase='align';alignGood=0;alignStart=performance.now();
   startBtn.textContent='Aligning…';ring.classList.add('hidden');liveq.classList.remove('on');
@@ -901,11 +901,14 @@ function finish(){
     $('refInput').value='';$('refInput').classList.remove('hidden');$('refSave').classList.remove('hidden');
     $('refbox').classList.remove('hidden');
     refreshPersonUI();
+    // collapse the big camera stage — results are below; keep only the Scan Again button
+    $('stage').classList.add('hidden');wave.classList.add('hidden');resetBtn.classList.add('hidden');
   } else hint.textContent='Could not lock a signal — try better lighting & stay still';
 }
 function reset(){
   scanning=false;phase='idle';cancelAnimationFrame(raf);clearInterval(beatTimer);samples=[];liveq.classList.remove('on');
   stopCamera();
+  $('stage').classList.remove('hidden');wave.classList.remove('hidden');resetBtn.classList.remove('hidden');
   startBtn.textContent='Start Scan';startBtn.disabled=false;ring.classList.add('hidden');oval.className='oval';
   hint.textContent='Tap Start, then fill the oval with your face';
   wctx.clearRect(0,0,wave.width,wave.height);
