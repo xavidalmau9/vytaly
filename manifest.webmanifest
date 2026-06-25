@@ -1,0 +1,13 @@
+{
+  "name": "Vytaly — 60-Second Health Scan",
+  "short_name": "Vytaly",
+  "description": "Read your pulse, HRV, stress and wellness from a 60-second face scan. Private, on-device.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
+  "icons": [
+    { "src": "logo-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

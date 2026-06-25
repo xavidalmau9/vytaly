@@ -4,7 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Vytaly · 60-Second Face Scan</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23070b14'/%3E%3Cpath d='M16 30 L30 30 L37 30 L44 64 L52 22 L59 50 L64 42 L70 50 L84 50' stroke='%2300e5a8' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#070b14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vytaly">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="logo-icon.svg">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23070b14'/%3E%3Cpath d='M16 50 L30 50 L37 50 L45 78 L53 22 L60 60 L65 46 L71 54 L84 54' stroke='%2300e5a8' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#070b14; --panel:#0e1424; --panel2:#131b2e; --line:#1e2940;
@@ -26,14 +32,14 @@
   h1{font-size:18px;font-weight:700;letter-spacing:.3px}
   .tag{font-size:10.5px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
 
-  /* who's scanning chip */
   .who{margin:12px 0 4px;display:flex;align-items:center;gap:9px;background:var(--panel);
     border:1px solid var(--line);border-radius:13px;padding:9px 13px;cursor:pointer}
   .who .av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#06b6d4);
     color:#04140f;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
   .who .nm{font-weight:700;font-size:14px}
   .who .meta{font-size:11px;color:var(--muted)}
-  .who .chev{margin-left:auto;color:var(--muted);font-size:13px}
+  .who .streak{margin-left:auto;font-size:12px;font-weight:700;color:var(--amber)}
+  .who .chev{color:var(--muted);font-size:13px;margin-left:8px}
 
   .stage{position:relative;width:100%;aspect-ratio:4/5;border-radius:22px;overflow:hidden;margin-top:10px;
     background:#05080f;border:1px solid var(--line);box-shadow:0 20px 50px rgba(0,0,0,.5)}
@@ -43,8 +49,11 @@
     transition:border-color .3s, box-shadow .3s;pointer-events:none}
   .oval.good{border-color:var(--accent);border-style:solid;box-shadow:0 0 0 4000px rgba(5,8,15,.55),0 0 30px rgba(0,229,168,.4)}
   .oval.bad{border-color:var(--amber)}
-  .hint{position:absolute;left:0;right:0;bottom:16px;text-align:center;font-size:13px;color:#fff;
+  .hint{position:absolute;left:0;right:0;bottom:34px;text-align:center;font-size:13px;color:#fff;
     text-shadow:0 1px 4px #000;padding:0 24px;font-weight:500}
+  .liveq{position:absolute;left:24px;right:24px;bottom:18px;height:6px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden;opacity:0;transition:opacity .3s}
+  .liveq i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s,background .25s}
+  .liveq.on{opacity:1}
   .ring{position:absolute;top:14px;left:50%;transform:translateX(-50%)}
   .ring svg{transform:rotate(-90deg)}
   .ring .t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700}
@@ -91,9 +100,16 @@
   .q-bar{height:5px;border-radius:3px;background:var(--line);margin-top:8px;overflow:hidden}
   .q-fill{height:100%;width:0;background:var(--accent);transition:width .3s,background .3s}
 
-  /* history */
+  .refbox{margin-top:11px;background:var(--panel);border:1px dashed var(--line);border-radius:14px;padding:13px 15px;
+    display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+  .refbox input{width:74px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:8px;font-size:14px;font-family:inherit}
+  .refbox button{flex:0 0 auto;width:auto;padding:9px 14px;font-size:12px}
+
   .hist{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:15px}
-  .hist h3{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between}
+  .hist h3{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+  .hist .tools{display:flex;gap:6px}
+  .chip{font-size:10px;font-weight:700;padding:4px 9px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);cursor:pointer}
+  .chip.on{color:var(--accent);border-color:var(--accent)}
   .spark{width:100%;height:54px;display:block;margin-bottom:8px}
   .hrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
   .hrow:first-of-type{border-top:none}
@@ -108,13 +124,14 @@
   .disclaimer{margin-top:14px;font-size:10px;color:#5a667e;text-align:center;line-height:1.55}
   .hidden{display:none!important}
 
-  /* overlay */
-  .ov{position:fixed;inset:0;background:rgba(4,7,13,.82);backdrop-filter:blur(6px);z-index:50;
+  .ov{position:fixed;inset:0;background:rgba(4,7,13,.85);backdrop-filter:blur(6px);z-index:50;
     display:flex;align-items:center;justify-content:center;padding:18px}
   .sheet{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:22px;
     padding:22px;max-height:90vh;overflow:auto}
   .sheet h2{font-size:18px;margin-bottom:4px}
-  .sheet p.s{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+  .sheet p.s{font-size:12.5px;color:var(--muted);margin-bottom:16px;line-height:1.55}
+  .sheet ul{margin:0 0 16px 0;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.7}
+  .sheet ul b{color:var(--txt)}
   .person{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--line);border-radius:13px;
     margin-bottom:9px;cursor:pointer;transition:border-color .2s}
   .person:hover{border-color:var(--accent)}
@@ -125,21 +142,22 @@
   .person .meta{font-size:11px;color:var(--muted)}
   .person .active-tick{margin-left:auto;color:var(--accent);font-weight:800}
   .ovbtns{display:flex;gap:10px;margin-top:14px}
-  .link{background:none;border:none;color:var(--accent2);font-size:13px;cursor:pointer;padding:8px;font-weight:600}
+  .logomark{width:64px;height:64px;margin:0 auto 14px;display:block}
   @keyframes ping{0%{transform:scale(.8);opacity:1}100%{transform:scale(2.2);opacity:0}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="logo"><svg viewBox="0 0 100 100"><path d="M16 32 L30 32 L37 32 L45 66 L53 22 L60 52 L65 44 L71 52 L84 52" stroke="#00e5a8" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="logo"><svg viewBox="0 0 100 100"><path d="M16 50 L30 50 L37 50 L45 78 L53 22 L60 60 L65 46 L71 54 L84 54" stroke="#00e5a8" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <div><h1>Vyta<span style="color:var(--accent)">ly</span></h1></div>
   </header>
-  <div class="tag">60-Second Face Scan · rPPG · 100% On-Device</div>
+  <div class="tag">60-Second Face Scan · rPPG (POS) · 100% On-Device</div>
 
   <div class="who" id="whoChip">
     <div class="av" id="whoAv">G</div>
     <div><div class="nm" id="whoName">Guest</div><div class="meta" id="whoMeta">Tap to switch person</div></div>
+    <div class="streak" id="whoStreak"></div>
     <div class="chev">▾</div>
   </div>
 
@@ -156,6 +174,7 @@
       <div class="t" id="ringT">40</div>
     </div>
     <div class="hint" id="hint">Tap Start, then fill the oval with your face</div>
+    <div class="liveq" id="liveq"><i id="liveqFill"></i></div>
   </div>
 
   <div class="controls">
@@ -175,7 +194,6 @@
     </div>
   </details>
 
-  <!-- MEASURED -->
   <div class="sec-h"><span>Measured from your pulse</span><span class="pill real">✓ REAL rPPG</span><span class="line"></span></div>
   <div class="grid">
     <div class="card hero">
@@ -193,28 +211,55 @@
   </div>
   <div class="grid" id="measuredGrid" style="margin-top:11px"></div>
 
-  <!-- DERIVED -->
+  <div class="refbox" id="refbox">
+    <span id="refMsg">📏 Check accuracy — enter a reference HR from a watch/oximeter:</span>
+    <input id="refInput" type="number" inputmode="numeric" placeholder="bpm">
+    <button class="primary" id="refSave">Log</button>
+  </div>
+
   <div class="sec-h"><span>Derived insights</span><span class="pill est">~ ESTIMATE</span><span class="line"></span></div>
   <div class="grid" id="derivedGrid"></div>
 
-  <!-- HISTORY -->
   <div class="sec-h"><span>Scan history</span><span class="line"></span></div>
   <div class="hist">
-    <h3><span id="histName">Guest</span><span id="histCount" style="color:var(--muted)"></span></h3>
+    <h3><span id="histName">Guest</span>
+      <span class="tools">
+        <span class="chip on" data-m="bpm">HR</span>
+        <span class="chip" data-m="sdnn">HRV</span>
+        <span class="chip" data-m="stress">Stress</span>
+        <span class="chip" id="exportBtn">⤓ Export</span>
+      </span>
+    </h3>
     <canvas class="spark" id="spark" width="440" height="54"></canvas>
     <div id="histList"><div class="empty">No scans yet — run your first scan above.</div></div>
   </div>
 
   <div class="note">
     <b>Honest by design.</b> The <b style="color:var(--green)">green</b> metrics are genuinely measured —
-    heart rate and beat-to-beat timing read straight from blood flow under your skin (real rPPG).
-    The <b style="color:var(--amber)">amber</b> metrics are derived from that pulse with standard physiological
-    formulas (directional, not clinical). <b>Not shown yet:</b> blood pressure, glucose, SpO₂, hemoglobin —
-    those need trained AI models on labeled medical data (<b>Phase 2</b>). We will never display a made-up medical number.
+    your pulse is extracted with the <b>POS algorithm</b> (a research-grade rPPG method that combines the red, green
+    and blue channels to cancel motion and lighting noise) from skin-only pixels. The <b style="color:var(--amber)">amber</b>
+    metrics are derived from that pulse with standard physiological formulas (directional, not clinical).
+    <b>Not shown yet:</b> blood pressure, glucose, SpO₂, hemoglobin — those need trained AI models (<b>Phase 2</b>).
+    We will never display a made-up medical number.
   </div>
   <div class="disclaimer">
     Not a medical device. Demonstration only — do not use for any health decision.<br>
     Everything (video, profiles, history) stays on this device. Cloud accounts come in Phase 2.
+  </div>
+</div>
+
+<!-- Consent overlay -->
+<div class="ov hidden" id="consentOv">
+  <div class="sheet">
+    <img class="logomark" src="logo-icon.svg" alt="Vytaly">
+    <h2 style="text-align:center">Welcome to Vytaly</h2>
+    <p class="s" style="text-align:center">A 60-second face scan that reads your pulse and wellness — privately.</p>
+    <ul>
+      <li><b>Your camera</b> is used only during a scan. The video is processed on your device and <b>never uploaded or saved</b>.</li>
+      <li><b>Your profile & history</b> stay in this browser, on this device only.</li>
+      <li>Vytaly is <b>not a medical device</b> and does not diagnose. It surfaces trends — always see a clinician for medical concerns.</li>
+    </ul>
+    <button class="primary" id="consentBtn">I understand & agree</button>
   </div>
 </div>
 
@@ -249,21 +294,23 @@
   </div>
 </div>
 
-<canvas id="proc" width="100" height="100" class="hidden"></canvas>
+<canvas id="proc" width="120" height="120" class="hidden"></canvas>
 
 <script>
 const $=id=>document.getElementById(id);
+const APP_VER='vytaly-poc/0.4';
 const video=$('video'), proc=$('proc'), pctx=proc.getContext('2d',{willReadFrequently:true});
 const oval=$('oval'), hint=$('hint');
 const startBtn=$('startBtn'), resetBtn=$('resetBtn');
 const ring=$('ring'), ringArc=$('ringArc'), ringT=$('ringT'), pulsedot=$('pulsedot');
 const wave=$('wave'), wctx=wave.getContext('2d');
+const liveq=$('liveq'), liveqFill=$('liveqFill');
 
 let stream=null, scanning=false, raf=null;
-const SCAN_SECONDS=40, FS_TARGET=30;   // 40s for better HRV (RMSSD/pNN50)
-let samples=[], startT=0;
+const SCAN_SECONDS=40, FS_TARGET=30;
+let samples=[], startT=0, lastRecord=null;
 
-/* ===================== DATA LAYER (local) ===================== */
+/* ===================== DATA LAYER ===================== */
 const DB={
   users:()=>JSON.parse(localStorage.getItem('vs_users')||'[]'),
   saveUsers:u=>localStorage.setItem('vs_users',JSON.stringify(u)),
@@ -273,17 +320,30 @@ const DB={
   saveHist:h=>localStorage.setItem('vs_history',JSON.stringify(h)),
   onboarded:()=>localStorage.getItem('vs_onboarded')==='1',
   setOnboarded:()=>localStorage.setItem('vs_onboarded','1'),
+  consented:()=>localStorage.getItem('vs_consent')==='1',
+  setConsent:()=>localStorage.setItem('vs_consent','1'),
 };
 const uid=()=>'u'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
 function activePerson(){
   const a=DB.active();
   if(a==='guest'||a==='') return {id:'guest',name:'Guest',guest:true};
-  const u=DB.users().find(x=>x.id===a);
-  return u||{id:'guest',name:'Guest',guest:true};
+  return DB.users().find(x=>x.id===a)||{id:'guest',name:'Guest',guest:true};
 }
-function initials(n){return (n||'G').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'G';}
+const initials=n=>(n||'G').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase()||'G';
 
-/* ===================== PROFILE (bound to active person) ===================== */
+/* ===================== STREAK ===================== */
+function dayKey(ts){const d=new Date(ts);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function streakFor(id){
+  const list=(DB.hist()[id]||[]); if(!list.length) return 0;
+  const days=new Set(list.map(s=>dayKey(s.ts)));
+  let streak=0, d=new Date();
+  // allow today OR yesterday as the active anchor
+  if(!days.has(dayKey(d.getTime()))) d.setDate(d.getDate()-1);
+  while(days.has(dayKey(d.getTime()))){streak++;d.setDate(d.getDate()-1);}
+  return streak;
+}
+
+/* ===================== PROFILE ===================== */
 function refreshPersonUI(){
   const p=activePerson();
   $('whoAv').textContent=p.guest?'G':initials(p.name);
@@ -291,35 +351,39 @@ function refreshPersonUI(){
   $('whoMeta').textContent=p.guest?'Guest · tap to switch':(p.email||'tap to switch person');
   $('profForName').textContent=p.name;
   $('pAge').value=p.age||''; $('pSex').value=p.sex||''; $('pHt').value=p.ht||''; $('pWt').value=p.wt||'';
+  const st=p.guest?0:streakFor(p.id);
+  $('whoStreak').textContent=st>0?('🔥 '+st):'';
   renderHistory();
 }
 function getProfile(){const p=activePerson();return{age:+($('pAge').value||p.age)||null,sex:$('pSex').value||p.sex||null,ht:+($('pHt').value||p.ht)||null,wt:+($('pWt').value||p.wt)||null};}
 function persistProfileEdits(){
-  const p=activePerson(); if(p.guest) return; // guest edits are ephemeral
+  const p=activePerson(); if(p.guest) return;
   const users=DB.users(); const u=users.find(x=>x.id===p.id); if(!u) return;
   u.age=+$('pAge').value||null; u.sex=$('pSex').value||null; u.ht=+$('pHt').value||null; u.wt=+$('pWt').value||null;
   DB.saveUsers(users);
 }
 ['pAge','pSex','pHt','pWt'].forEach(k=>$(k).addEventListener('change',persistProfileEdits));
 
-/* ===================== PEOPLE OVERLAY ===================== */
-function openPeople(force){
+/* ===================== OVERLAYS ===================== */
+$('consentBtn').onclick=()=>{DB.setConsent();$('consentOv').classList.add('hidden');maybeOnboard();};
+function maybeOnboard(){ if(!DB.onboarded() && DB.users().length===0) openPeople(); }
+function openPeople(){
   $('peopleOv').classList.remove('hidden');
   $('peopleView').classList.remove('hidden'); $('addView').classList.add('hidden');
   const list=$('peopleList'); const users=DB.users(); const act=DB.active();
   list.innerHTML=users.map(u=>`<div class="person" data-id="${u.id}">
       <div class="av">${initials(u.name)}</div>
-      <div><div class="nm">${u.name}</div><div class="meta">${u.email||(u.age?u.age+' yrs':'')||'saved'}</div></div>
+      <div><div class="nm">${u.name}</div><div class="meta">${u.email||(u.age?u.age+' yrs':'')||'saved'} ${streakFor(u.id)>0?'· 🔥 '+streakFor(u.id):''}</div></div>
       ${act===u.id?'<div class="active-tick">✓</div>':''}</div>`).join('')
     || `<div class="empty" style="margin-bottom:8px">No people saved yet.</div>`;
   list.querySelectorAll('.person').forEach(el=>el.onclick=()=>selectPerson(el.dataset.id));
 }
 function closePeople(){$('peopleOv').classList.add('hidden');}
 function selectPerson(id){DB.setActive(id);DB.setOnboarded();closePeople();refreshPersonUI();}
-$('whoChip').onclick=()=>openPeople(false);
+$('whoChip').onclick=openPeople;
 $('guestRow').onclick=()=>selectPerson('guest');
 $('addPersonBtn').onclick=()=>{$('peopleView').classList.add('hidden');$('addView').classList.remove('hidden');};
-$('cancelAdd').onclick=()=>openPeople(false);
+$('cancelAdd').onclick=openPeople;
 $('saveAdd').onclick=()=>{
   const name=$('aName').value.trim(); if(!name){$('aName').focus();return;}
   const u={id:uid(),name,email:$('aEmail').value.trim(),age:+$('aAge').value||null,
@@ -329,7 +393,7 @@ $('saveAdd').onclick=()=>{
   selectPerson(u.id);
 };
 
-/* ===================== CAMERA ===================== */
+/* ===================== CAMERA + SKIN-SEGMENTED SAMPLING ===================== */
 async function initCamera(){
   try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});
@@ -337,31 +401,47 @@ async function initCamera(){
     hint.textContent='Fill the oval with your face, hold still, good light'; return true;
   }catch(e){ hint.textContent='⚠ Camera blocked. Open over https:// or localhost and allow camera.'; return false; }
 }
+// YCrCb skin test (Cr 133-173, Cb 77-127) + brightness gate
+function isSkin(R,G,B){
+  const y=0.299*R+0.587*G+0.114*B;
+  const cr=(R-y)*0.713+128, cb=(B-y)*0.564+128;
+  return y>50 && y<230 && cr>=133 && cr<=173 && cb>=77 && cb<=127;
+}
+let prevMean=null;
 function sampleFrame(){
   const vw=video.videoWidth, vh=video.videoHeight; if(!vw) return null;
-  const sx=vw*0.30, sy=vh*0.22, sw=vw*0.40, sh=vh*0.30;
-  pctx.drawImage(video,sx,sy,sw,sh,0,0,100,100);
-  const d=pctx.getImageData(0,0,100,100).data;
-  let r=0,g=0,b=0,n=0;
-  for(let i=0;i<d.length;i+=4){const R=d[i],G=d[i+1],B=d[i+2];const br=(R+G+B)/3;
-    if(br<40||br>240)continue; r+=R;g+=G;b+=B;n++;}
-  if(n<500) return {ok:false};
-  return {ok:true,r:r/n,g:g/n,b:b/n};
+  // wider ROI to cover forehead + cheeks; skin segmentation isolates the face
+  const sx=vw*0.26, sy=vh*0.16, sw=vw*0.48, sh=vh*0.46;
+  pctx.drawImage(video,sx,sy,sw,sh,0,0,120,120);
+  const d=pctx.getImageData(0,0,120,120).data;
+  let r=0,g=0,b=0,n=0,total=0;
+  for(let i=0;i<d.length;i+=4){total++;const R=d[i],G=d[i+1],B=d[i+2];
+    if(isSkin(R,G,B)){r+=R;g+=G;b+=B;n++;}}
+  const skinFrac=n/total;
+  if(n<800||skinFrac<0.10) return {ok:false,skinFrac};
+  const gm=g/n, motion=prevMean==null?0:Math.abs(gm-prevMean); prevMean=gm;
+  return {ok:true,r:r/n,g:gm,b:b/n,skinFrac,motion};
 }
+
 function loop(){
   if(!scanning) return;
   const now=performance.now();
   const s=sampleFrame();
-  if(s&&s.ok){samples.push({t:now,g:s.g,r:s.r,b:s.b});oval.className='oval good';hint.textContent='Scanning… stay still';}
+  if(s&&s.ok){samples.push({t:now,r:s.r,g:s.g,b:s.b});oval.className='oval good';hint.textContent='Scanning… stay still';}
   else{oval.className='oval bad';hint.textContent='Center your face in the oval';}
   const elapsed=(now-startT)/1000, remain=Math.max(0,SCAN_SECONDS-elapsed);
   ringT.textContent=Math.ceil(remain); ringArc.style.strokeDashoffset=150.8*(remain/SCAN_SECONDS);
-  if(elapsed>8){const e=estimate(samples);if(e)drawWave(e.filtered);}
+  if(elapsed>6){
+    const e=estimate(samples);
+    if(e){drawWave(e.pulse); const q=Math.round(e.quality*100);
+      liveqFill.style.width=q+'%';
+      liveqFill.style.background=e.quality>0.6?'var(--green)':e.quality>0.3?'var(--amber)':'var(--red)';}
+  }
   if(elapsed>=SCAN_SECONDS){finish();return;}
   raf=requestAnimationFrame(loop);
 }
 
-/* ===================== SIGNAL PROCESSING (real rPPG) ===================== */
+/* ===================== SIGNAL PROCESSING — POS rPPG ===================== */
 function resample(sig,times,fs){
   if(times.length<2)return[];
   const t0=times[0],t1=times[times.length-1],N=Math.floor((t1-t0)/1000*fs),out=[];let j=0;
@@ -369,46 +449,70 @@ function resample(sig,times,fs){
     const span=times[j+1]-times[j]||1,frac=(t-times[j])/span;out.push(sig[j]+(sig[j+1]-sig[j])*frac);}
   return out;
 }
-const detrend=x=>{const m=x.reduce((a,b)=>a+b,0)/x.length;return x.map(v=>v-m);};
+const mean=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
+const std=a=>{const m=mean(a);return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/(a.length||1));};
+const detrend=x=>{const m=mean(x);return x.map(v=>v-m);};
 function movingAvg(x,w){const out=[];for(let i=0;i<x.length;i++){let s=0,c=0;for(let k=-w;k<=w;k++){const j=i+k;if(j>=0&&j<x.length){s+=x[j];c++;}}out.push(s/c);}return out;}
 function bandpass(x,fs,lo,hi){const wHi=Math.round(fs/lo),wLo=Math.max(1,Math.round(fs/hi/2));const base=movingAvg(x,wHi);const hp=x.map((v,i)=>v-base[i]);return movingAvg(hp,wLo);}
 function goertzel(x,fs,freq){const k=2*Math.cos(2*Math.PI*freq/fs);let s1=0,s2=0,s0;for(let i=0;i<x.length;i++){s0=x[i]+k*s1-s2;s2=s1;s1=s0;}return s1*s1+s2*s2-k*s1*s2;}
 function dominantFreq(x,fs,loHz,hiHz,step){let best=loHz,bestP=-1,total=0,c=0;for(let f=loHz;f<=hiHz;f+=step){const p=goertzel(x,fs,f);total+=p;c++;if(p>bestP){bestP=p;best=f;}}const snr=bestP/(total/c+1e-9);return{freq:best,power:bestP,snr};}
 function peaks(x){const idx=[];for(let i=2;i<x.length-2;i++){if(x[i]>x[i-1]&&x[i]>=x[i+1]&&x[i]>x[i-2]&&x[i]>x[i+2])idx.push(i);}return idx;}
 
+// POS (Wang et al. 2017): plane-orthogonal-to-skin, sliding window overlap-add
+function posPulse(R,G,B,fs){
+  const N=R.length, H=new Array(N).fill(0);
+  const l=Math.max(8,Math.round(fs*1.6));
+  for(let n=0;n+l<=N;n++){
+    let mr=0,mg=0,mb=0;
+    for(let i=n;i<n+l;i++){mr+=R[i];mg+=G[i];mb+=B[i];}
+    mr/=l;mg/=l;mb/=l; if(mr<1)mr=1; if(mg<1)mg=1; if(mb<1)mb=1;
+    const s1=new Array(l),s2=new Array(l);
+    for(let i=0;i<l;i++){const rn=R[n+i]/mr,gn=G[n+i]/mg,bn=B[n+i]/mb;
+      s1[i]=gn-bn; s2[i]=gn+bn-2*rn;}
+    const a=std(s1)/(std(s2)||1e-9);
+    const h=s1.map((v,i)=>v+a*s2[i]); const mh=mean(h);
+    for(let i=0;i<l;i++)H[n+i]+=(h[i]-mh);
+  }
+  return H;
+}
+function downsampleArr(a,target){
+  if(a.length<=target)return a.map(v=>+v.toFixed(4));
+  const out=[],step=a.length/target;
+  for(let i=0;i<target;i++)out.push(+a[Math.floor(i*step)].toFixed(4));
+  return out;
+}
+
 function estimate(raw){
-  if(raw.length<60)return null;
+  if(raw.length<48)return null;
   const times=raw.map(s=>s.t);
-  let g=resample(raw.map(s=>s.g),times,FS_TARGET); if(g.length<60)return null;
-  g=detrend(g);
-  const filtered=bandpass(g,FS_TARGET,0.7,4.0);
-  const hrBand=dominantFreq(filtered,FS_TARGET,0.7,3.0,0.01);
+  const R=resample(raw.map(s=>s.r),times,FS_TARGET);
+  const G=resample(raw.map(s=>s.g),times,FS_TARGET);
+  const B=resample(raw.map(s=>s.b),times,FS_TARGET);
+  if(G.length<48)return null;
+  let pulse=posPulse(R,G,B,FS_TARGET);
+  pulse=bandpass(pulse,FS_TARGET,0.7,4.0);
+  const hrBand=dominantFreq(pulse,FS_TARGET,0.7,3.0,0.01);
   const bpm=Math.round(hrBand.freq*60);
-  // respiration
-  const resp=bandpass(detrend(resample(raw.map(s=>s.g),times,FS_TARGET)),FS_TARGET,0.12,0.5);
-  const rrBand=dominantFreq(resp,FS_TARGET,0.12,0.5,0.005);
-  const rr=Math.round(rrBand.freq*60);
-  // beat timing -> real HRV family
-  const pk=peaks(filtered);
-  let sdnn=null,rmssd=null,pnn50=null,meanIBI=null;
+  // respiration from green low-frequency band
+  const resp=bandpass(detrend(G),FS_TARGET,0.12,0.5);
+  const rr=Math.round(dominantFreq(resp,FS_TARGET,0.12,0.5,0.005).freq*60);
+  // HRV from POS pulse peaks
+  const pk=peaks(pulse); let sdnn=null,rmssd=null,pnn50=null,meanIBI=null;
   if(pk.length>4){
     const ibi=[];for(let i=1;i<pk.length;i++)ibi.push((pk[i]-pk[i-1])/FS_TARGET*1000);
-    // filter implausible intervals (300-1500ms ~ 40-200bpm)
     const f=ibi.filter(v=>v>300&&v<1500);
     if(f.length>3){
-      meanIBI=Math.round(f.reduce((a,b)=>a+b,0)/f.length);
-      const mean=meanIBI;
-      sdnn=Math.round(Math.sqrt(f.reduce((a,b)=>a+(b-mean)**2,0)/f.length));
+      meanIBI=Math.round(mean(f)); sdnn=Math.round(std(f));
       let sq=0,nn=0;for(let i=1;i<f.length;i++){const dd=f[i]-f[i-1];sq+=dd*dd;if(Math.abs(dd)>50)nn++;}
-      rmssd=Math.round(Math.sqrt(sq/(f.length-1)));
-      pnn50=Math.round(nn/(f.length-1)*100);
+      rmssd=Math.round(Math.sqrt(sq/(f.length-1))); pnn50=Math.round(nn/(f.length-1)*100);
     }
   }
   const quality=Math.max(0,Math.min(1,(hrBand.snr-1)/6));
-  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,filtered,quality};
+  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,pulse,quality,
+    fps:Math.round(G.length/((times[times.length-1]-times[0])/1000)),frames:raw.length};
 }
 
-/* ===================== DERIVED (formula estimates) ===================== */
+/* ===================== DERIVED ===================== */
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function deriveBiomarkers(e,prof){
   const {bpm,rr,sdnn,rmssd}=e, age=prof.age, ht=prof.ht, wt=prof.wt, hrv=sdnn;
@@ -429,23 +533,16 @@ function deriveBiomarkers(e,prof){
 
 /* ===================== TILES ===================== */
 const MEASURED_TILES=[
-  {k:'sdnn',  lbl:'HRV (SDNN)',      u:'ms'},
-  {k:'rmssd', lbl:'HRV (RMSSD)',     u:'ms'},
-  {k:'rr',    lbl:'Respiratory Rate',u:'/min'},
-  {k:'meanIBI',lbl:'Mean Beat Interval',u:'ms'},
-  {k:'pnn50', lbl:'pNN50',           u:'%'},
+  {k:'sdnn',lbl:'HRV (SDNN)',u:'ms'},{k:'rmssd',lbl:'HRV (RMSSD)',u:'ms'},
+  {k:'rr',lbl:'Respiratory Rate',u:'/min'},{k:'meanIBI',lbl:'Mean Beat Interval',u:'ms'},
+  {k:'pnn50',lbl:'pNN50',u:'%'},
 ];
 const DERIVED_TILES=[
-  {k:'stress', lbl:'Stress Level',       u:'/100',need:''},
-  {k:'pns',    lbl:'Parasympathetic',    u:'/10', need:''},
-  {k:'sns',    lbl:'Sympathetic',        u:'/10', need:''},
-  {k:'ans',    lbl:'ANS Balance',        u:'',    need:''},
-  {k:'prq',    lbl:'Pulse-Resp Quotient',u:'',    need:''},
-  {k:'fatigue',lbl:'Fatigue Index',      u:'/100',need:''},
-  {k:'vo2',    lbl:'VO₂ Max',            u:'',    need:'age'},
-  {k:'bioAge', lbl:'Biological Age',     u:'yrs', need:'age'},
-  {k:'bmi',    lbl:'Body Mass Index',    u:'',    need:'height + weight'},
-  {k:'wellness',lbl:'Wellness Score',    u:'/100',need:''},
+  {k:'stress',lbl:'Stress Level',u:'/100',need:''},{k:'pns',lbl:'Parasympathetic',u:'/10',need:''},
+  {k:'sns',lbl:'Sympathetic',u:'/10',need:''},{k:'ans',lbl:'ANS Balance',u:'',need:''},
+  {k:'prq',lbl:'Pulse-Resp Quotient',u:'',need:''},{k:'fatigue',lbl:'Fatigue Index',u:'/100',need:''},
+  {k:'vo2',lbl:'VO₂ Max',u:'',need:'age'},{k:'bioAge',lbl:'Biological Age',u:'yrs',need:'age'},
+  {k:'bmi',lbl:'Body Mass Index',u:'',need:'height + weight'},{k:'wellness',lbl:'Wellness Score',u:'/100',need:''},
 ];
 function buildGrids(){
   $('measuredGrid').innerHTML=MEASURED_TILES.map(t=>
@@ -458,7 +555,7 @@ buildGrids();
 function drawWave(sig){
   if(!sig||!sig.length)return;
   const W=wave.width,H=wave.height; wctx.clearRect(0,0,W,H);
-  const tail=sig.slice(-Math.min(sig.length,180));
+  const tail=sig.slice(-Math.min(sig.length,200));
   let mn=Math.min(...tail),mx=Math.max(...tail);const rng=(mx-mn)||1;
   wctx.beginPath();wctx.strokeStyle='#00e5a8';wctx.lineWidth=2;
   tail.forEach((v,i)=>{const x=i/(tail.length-1)*W,y=H-((v-mn)/rng)*(H*0.8)-H*0.1;i?wctx.lineTo(x,y):wctx.moveTo(x,y);});
@@ -470,7 +567,7 @@ function setHero(e){
   if(e.quality>0.6){qt.textContent='Good';qt.style.color='var(--green)';qf.style.background='var(--green)';}
   else if(e.quality>0.3){qt.textContent='Fair';qt.style.color='var(--amber)';qf.style.background='var(--amber)';}
   else{qt.textContent='Low';qt.style.color='var(--red)';qf.style.background='var(--red)';}
-  $('hrSub').textContent=e.quality>0.6?'Strong pulse signal locked':'Hold stiller / better light for accuracy';
+  $('hrSub').textContent=e.quality>0.6?'Strong pulse signal (POS)':'Hold stiller / better light for accuracy';
 }
 function setMetrics(e,b){
   MEASURED_TILES.forEach(t=>{const v=e[t.k];$('m_'+t.k).textContent=(v==null||Number.isNaN(v))?'—':v;});
@@ -478,60 +575,98 @@ function setMetrics(e,b){
     const ne=$('need_'+t.k);if(ne)ne.textContent=(v==null)?('add '+t.need+' ↑'):'';});
 }
 
-/* ===================== HISTORY ===================== */
-function saveScan(e,b){
-  const p=activePerson(); if(p.guest) return; // guests aren't persisted
-  const h=DB.hist(); (h[p.id]=h[p.id]||[]).push({
-    ts:Date.now(),bpm:e.bpm,sdnn:e.sdnn,rmssd:e.rmssd,rr:e.rr,
-    stress:b.stress,wellness:b.wellness,q:Math.round(e.quality*100)});
-  if(h[p.id].length>60)h[p.id]=h[p.id].slice(-60);
-  DB.saveHist(h);
+/* ===================== HISTORY + EXPORT (Track 3) ===================== */
+function buildRecord(e,b,prof){
+  return {v:APP_VER,ts:Date.now(),bpm:e.bpm,sdnn:e.sdnn,rmssd:e.rmssd,pnn50:e.pnn50,
+    meanIBI:e.meanIBI,rr:e.rr,q:Math.round(e.quality*100),
+    stress:b.stress,wellness:b.wellness,derived:b,
+    profile:{age:prof.age,sex:prof.sex,ht:prof.ht,wt:prof.wt},
+    refHR:null,
+    capture:{fps:e.fps,durSec:SCAN_SECONDS,frames:e.frames,ua:navigator.userAgent,sw:screen.width,sh:screen.height},
+    waveform:downsampleArr(e.pulse,160)};
+}
+function saveScan(rec){
+  const p=activePerson(); if(p.guest) return null;
+  const h=DB.hist(); (h[p.id]=h[p.id]||[]).push(rec);
+  if(h[p.id].length>120)h[p.id]=h[p.id].slice(-120);
+  DB.saveHist(h); return p.id;
+}
+let histMetric='bpm';
+document.querySelectorAll('.chip[data-m]').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('.chip[data-m]').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); histMetric=c.dataset.m; renderHistory();
+});
+$('exportBtn').onclick=exportData;
+function exportData(){
+  const p=activePerson(); const list=DB.hist()[p.id]||[];
+  if(p.guest||!list.length){alert('No saved scans to export. Add a person and scan first.');return;}
+  const payload={app:APP_VER,exportedAt:new Date().toISOString(),person:{name:p.name,email:p.email},scans:list};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='vytaly-'+(p.name||'data').replace(/\s+/g,'_')+'.json';a.click();
 }
 function renderHistory(){
   const p=activePerson(); $('histName').textContent=p.name;
   const list=DB.hist()[p.id]||[];
-  $('histCount').textContent=list.length?(list.length+' scan'+(list.length>1?'s':'')):'';
   const sp=$('spark'),sc=sp.getContext('2d');sc.clearRect(0,0,sp.width,sp.height);
   const lc=$('histList');
   if(p.guest){lc.innerHTML='<div class="empty">Guest scans aren\'t saved. Add a person to keep history.</div>';return;}
   if(!list.length){lc.innerHTML='<div class="empty">No scans yet — run your first scan above.</div>';return;}
-  // sparkline of bpm
-  const W=sp.width,H=sp.height,pts=list.map(s=>s.bpm).filter(Boolean);
+  const W=sp.width,H=sp.height,pts=list.map(s=>s[histMetric]).filter(v=>v!=null);
   if(pts.length>1){const mn=Math.min(...pts),mx=Math.max(...pts),rng=(mx-mn)||1;
     sc.beginPath();sc.strokeStyle='#38bdf8';sc.lineWidth=2;
     pts.forEach((v,i)=>{const x=i/(pts.length-1)*(W-8)+4,y=H-((v-mn)/rng)*(H-16)-8;i?sc.lineTo(x,y):sc.moveTo(x,y);});
     sc.stroke();
-    pts.forEach((v,i)=>{const x=i/(pts.length-1)*(W-8)+4,y=H-((v-mn)/rng)*(H-16)-8;
-      sc.beginPath();sc.fillStyle='#38bdf8';sc.arc(x,y,2.5,0,6.3);sc.fill();});}
-  lc.innerHTML=list.slice().reverse().slice(0,10).map(s=>{
+    pts.forEach((v,i)=>{const x=i/(pts.length-1)*(W-8)+4,y=H-((v-mn)/rng)*(H-16)-8;sc.beginPath();sc.fillStyle='#38bdf8';sc.arc(x,y,2.5,0,6.3);sc.fill();});}
+  lc.innerHTML=list.slice().reverse().slice(0,12).map(s=>{
     const d=new Date(s.ts),ds=d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+    const ref=s.refHR?` · ref ${s.refHR} (Δ${Math.abs(s.refHR-s.bpm)})`:'';
     return `<div class="hrow"><b style="color:var(--accent)">${s.bpm||'—'}</b><span class="unit">bpm</span>
       <span class="d">${ds}</span>
-      <span class="s">stress ${s.stress??'—'} · HRV ${s.sdnn??'—'}ms</span></div>`;
+      <span class="s">stress ${s.stress??'—'} · HRV ${s.sdnn??'—'}ms${ref}</span></div>`;
   }).join('');
 }
+// reference HR logging (static refbox — no innerHTML gymnastics)
+$('refSave').onclick=()=>{
+  const v=+$('refInput').value; if(!v||!lastRecord){return;}
+  lastRecord.refHR=v;
+  const p=activePerson(); if(!p.guest){const h=DB.hist();const arr=h[p.id]||[];
+    if(arr.length){arr[arr.length-1].refHR=v;DB.saveHist(h);}}
+  const dlt=Math.abs(v-(lastRecord.bpm||0));
+  $('refMsg').innerHTML=`Logged. Vytaly read <b style="color:var(--accent)">${lastRecord.bpm}</b>, ref <b>${v}</b> — off by <b style="color:${dlt<=5?'var(--green)':dlt<=10?'var(--amber)':'var(--red)'}">${dlt} bpm</b>. Thanks!`;
+  $('refInput').classList.add('hidden');$('refSave').classList.add('hidden');
+  renderHistory();
+};
 
 /* ===================== SCAN FLOW ===================== */
 let beatTimer=null;
 async function start(){
   if(scanning)return;
+  if(!DB.consented()){$('consentOv').classList.remove('hidden');return;}
   if(!stream){const ok=await initCamera();if(!ok)return;}
-  samples=[];scanning=true;startT=performance.now();
-  startBtn.textContent='Scanning…';startBtn.disabled=true;ring.classList.remove('hidden');
+  samples=[];prevMean=null;scanning=true;startT=performance.now();
+  startBtn.textContent='Scanning…';startBtn.disabled=true;ring.classList.remove('hidden');liveq.classList.add('on');
   $('hr').textContent='—';MEASURED_TILES.forEach(t=>$('m_'+t.k).textContent='—');DERIVED_TILES.forEach(t=>$('d_'+t.k).textContent='—');
+  $('refbox').classList.add('hidden');
   beatTimer=setInterval(()=>{const hr=parseInt($('hr').textContent);if(hr){pulsedot.style.animation='ping .6s ease-out';setTimeout(()=>pulsedot.style.animation='',600);}},700);
   raf=requestAnimationFrame(loop);
 }
 function finish(){
-  scanning=false;cancelAnimationFrame(raf);clearInterval(beatTimer);
+  scanning=false;cancelAnimationFrame(raf);clearInterval(beatTimer);liveq.classList.remove('on');
   startBtn.textContent='Scan Again';startBtn.disabled=false;oval.className='oval';
   hint.textContent='Done — results below';
   const e=estimate(samples);
-  if(e&&e.bpm){const b=deriveBiomarkers(e,getProfile());setHero(e);drawWave(e.filtered);setMetrics(e,b);saveScan(e,b);renderHistory();}
-  else hint.textContent='Could not lock a signal — try better lighting & stay still';
+  if(e&&e.bpm){const prof=getProfile(),b=deriveBiomarkers(e,prof);
+    setHero(e);drawWave(e.pulse);setMetrics(e,b);
+    lastRecord=buildRecord(e,b,prof);saveScan(lastRecord);
+    $('refMsg').textContent='📏 Check accuracy — enter a reference HR from a watch/oximeter:';
+    $('refInput').value='';$('refInput').classList.remove('hidden');$('refSave').classList.remove('hidden');
+    $('refbox').classList.remove('hidden');
+    refreshPersonUI();
+  } else hint.textContent='Could not lock a signal — try better lighting & stay still';
 }
 function reset(){
-  scanning=false;cancelAnimationFrame(raf);clearInterval(beatTimer);samples=[];
+  scanning=false;cancelAnimationFrame(raf);clearInterval(beatTimer);samples=[];liveq.classList.remove('on');
   startBtn.textContent='Start Scan';startBtn.disabled=false;ring.classList.add('hidden');oval.className='oval';
   hint.textContent='Tap Start, then fill the oval with your face';
   wctx.clearRect(0,0,wave.width,wave.height);
@@ -541,10 +676,12 @@ function reset(){
 startBtn.addEventListener('click',start);
 resetBtn.addEventListener('click',reset);
 
-/* ===================== BOOT ===================== */
+/* ===================== BOOT + PWA ===================== */
 window.addEventListener('load',()=>{wave.width=wave.offsetWidth;});
+$('refbox').classList.add('hidden');
 refreshPersonUI();
-if(!DB.onboarded() && DB.users().length===0) openPeople(true);
+if(!DB.consented()) $('consentOv').classList.remove('hidden'); else maybeOnboard();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
 </script>
 </body>
 </html>
