@@ -1074,6 +1074,10 @@ function finish(){
     lastRecord=buildRecord(e,b,prof);
     const _cal=getBPCal();if(_cal)lastRecord.bp=estimateBP(lastScanFeat,_cal);
     saveScan(lastRecord); uploadScan(lastRecord); renderBP();
+    const _shared=!!(contributing()&&UPLOAD_URL&&WRITE_KEY);
+    if($('summaryText')) $('summaryText').innerHTML += _shared
+      ? '<br><span style="color:var(--accent)">✓ Shared to your Vytaly dataset.</span>'
+      : '<br><span style="color:var(--muted)">Sharing is off — turn on “Contribute scans” in your Profile to add scans to the dataset.</span>';
     $('refMsg').textContent='📏 Check accuracy — enter a reference HR from a watch/oximeter:';
     $('refInput').value='';$('refInput').classList.remove('hidden');$('refSave').classList.remove('hidden');
     $('refbox').classList.remove('hidden');
