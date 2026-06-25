@@ -165,7 +165,7 @@
     padding:18px 16px 16px;margin-top:6px}
   .wlabel{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700}
   .wgauge{width:100%;max-width:250px;margin:6px auto 0;display:block}
-  .wscore{font-size:46px;font-weight:800;line-height:.9;margin-top:-26px}
+  .wscore{font-size:44px;font-weight:800;line-height:.9;margin-top:-54px}
   .wstatus{font-size:15px;font-weight:700;margin-top:8px;color:var(--muted)}
   .whint{font-size:10.5px;color:var(--muted);margin-top:12px;opacity:.85}
 </style>
@@ -227,8 +227,7 @@
       </linearGradient></defs>
       <path d="M22 110 A 88 88 0 0 1 198 110" fill="none" stroke="#1e2940" stroke-width="15" stroke-linecap="round"/>
       <path d="M22 110 A 88 88 0 0 1 198 110" fill="none" stroke="url(#wgrad)" stroke-width="15" stroke-linecap="round"/>
-      <line id="wneedle" x1="110" y1="110" x2="110" y2="36" stroke="#eaf0fb" stroke-width="4" stroke-linecap="round" transform="rotate(-90 110 110)"/>
-      <circle cx="110" cy="110" r="7" fill="#eaf0fb"/>
+      <circle id="wmark" cx="22" cy="110" r="10" fill="#7e8aa3" stroke="#0c1322" stroke-width="3.5"/>
     </svg>
     <div class="wscore"><span id="wScore">—</span></div>
     <div class="wstatus" id="wStatus">Run a scan to see your score</div>
@@ -555,7 +554,7 @@ function deriveBiomarkers(e,prof){
   const {bpm,rr,sdnn,rmssd}=e, age=prof.age, ht=prof.ht, wt=prof.wt, hrv=sdnn;
   const o={};
   o.prq=(bpm&&rr)?+(bpm/rr).toFixed(1):null;
-  o.stress=hrv!=null?clamp(Math.round(120-hrv*0.9),1,99):null;
+  o.stress=hrv!=null?clamp(Math.round(90-hrv),1,99):null;
   o.pns=(rmssd!=null)?+clamp(rmssd/10,0,10).toFixed(1):(hrv!=null?+clamp(hrv/12,0,10).toFixed(1):null);
   o.sns=hrv!=null?+clamp(10-hrv/12+(bpm-65)/9,0,10).toFixed(1):null;
   o.ans=(o.pns!=null&&o.sns!=null)?(o.pns>=o.sns?'Recovery':'Activated'):null;
@@ -563,9 +562,33 @@ function deriveBiomarkers(e,prof){
   if(age&&bpm){const hrMax=208-0.7*age;o.vo2=clamp(Math.round(15.3*hrMax/bpm),18,72);}else o.vo2=null;
   if(age){let ba=age+(bpm-65)*0.12-((hrv||40)-40)*0.10;o.bioAge=clamp(Math.round(ba),16,95);}else o.bioAge=null;
   o.bmi=(ht&&wt)?+(wt/((ht/100)**2)).toFixed(1):null;
-  let w=100;if(o.stress)w-=o.stress*0.25;if(bpm>70)w-=(bpm-70)*0.4;if(hrv!=null)w+=Math.min(hrv,80)*0.25;
-  o.wellness=clamp(Math.round(w),1,100);
+  o.wellness=wellnessScore(e,o);
   return o;
+}
+// Each metric scored 0-100 for how optimal it is, then weighted-averaged.
+// Realistic: a typical person lands in the 60s-70s; 100 needs every component optimal.
+const SCORE={
+  bpm:{type:'band',lo:55,hi:70,sp:18,w:1.2},
+  sdnn:{type:'ramp',lo:15,hi:75,w:1.3},
+  rmssd:{type:'ramp',lo:12,hi:65,w:1.0},
+  rr:{type:'band',lo:12,hi:18,sp:5,w:0.7},
+  pnn50:{type:'ramp',lo:2,hi:32,w:0.8},
+  stress:{type:'inv',w:1.2},
+  fatigue:{type:'inv',w:0.9},
+  vo2:{type:'ramp',lo:25,hi:55,w:1.0},
+  bmi:{type:'band',lo:18.5,hi:24.9,sp:4,w:0.8},
+  prq:{type:'band',lo:3.8,hi:5.2,sp:1.4,w:0.5},
+};
+function scoreOne(k,v){const c=SCORE[k];if(!c||v==null||Number.isNaN(v))return null;
+  if(c.type==='inv')return clamp(100-v,0,100);
+  if(c.type==='ramp')return clamp((v-c.lo)/(c.hi-c.lo)*100,0,100);
+  if(c.type==='band'){if(v>=c.lo&&v<=c.hi)return 100;const d=v<c.lo?c.lo-v:v-c.hi;return clamp(100*Math.exp(-(d*d)/(2*c.sp*c.sp)),0,100);}
+  return null;}
+function wellnessScore(e,o){
+  const vals={bpm:e.bpm,sdnn:e.sdnn,rmssd:e.rmssd,rr:e.rr,pnn50:e.pnn50,stress:o.stress,fatigue:o.fatigue,vo2:o.vo2,bmi:o.bmi,prq:o.prq};
+  let sum=0,wsum=0;
+  for(const k in SCORE){const s=scoreOne(k,vals[k]);if(s!=null){sum+=s*SCORE[k].w;wsum+=SCORE[k].w;}}
+  return wsum?Math.round(sum/wsum):null;
 }
 
 /* ===================== TILES + RANGES (graphic scales) ===================== */
@@ -649,14 +672,16 @@ function buildGrids(){
 buildGrids();
 
 let _lastWell=0;
+function wmarkPos(score){const a=Math.PI*(1-clamp(score,0,100)/100);return{x:110+88*Math.cos(a),y:110-88*Math.sin(a)};}
 function renderWellness(score){
-  const el=$('wScore'),stt=$('wStatus'),ndl=$('wneedle');
-  if(score==null){el.textContent='—';el.style.color='var(--txt)';stt.textContent='Run a scan to see your score';stt.style.color='var(--muted)';ndl.setAttribute('transform','rotate(-90 110 110)');_lastWell=0;return;}
-  const s=score>=80?['Excellent','green']:score>=60?['Good','teal']:score>=40?['Fair','amber']:['Needs care','red'];
+  const el=$('wScore'),stt=$('wStatus'),mk=$('wmark');
+  if(score==null){el.textContent='—';el.style.color='var(--txt)';stt.textContent='Run a scan to see your score';stt.style.color='var(--muted)';
+    const p=wmarkPos(0);mk.setAttribute('cx',p.x);mk.setAttribute('cy',p.y);mk.setAttribute('fill','#7e8aa3');_lastWell=0;return;}
+  const s=score>=85?['Excellent','green']:score>=70?['Good','teal']:score>=55?['Fair','amber']:score>=40?['Below average','amber']:['Needs attention','red'];
   stt.textContent=s[0];stt.style.color=COL[s[1]];el.style.color=COL[s[1]];
   const from=_lastWell,t0=performance.now();
   (function step(t){const k=Math.min(1,(t-t0)/750),cur=from+(score-from)*k;
-    el.textContent=Math.round(cur);ndl.setAttribute('transform','rotate('+(-90+cur/100*180)+' 110 110)');
+    el.textContent=Math.round(cur);const p=wmarkPos(cur);mk.setAttribute('cx',p.x);mk.setAttribute('cy',p.y);mk.setAttribute('fill',COL[s[1]]);
     if(k<1)requestAnimationFrame(step);else _lastWell=score;})(t0);
 }
 
