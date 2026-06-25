@@ -375,6 +375,8 @@ const liveq=$('liveq'), liveqFill=$('liveqFill');
 let stream=null, scanning=false, raf=null;
 const SCAN_SECONDS=40, FS_TARGET=30;
 let samples=[], startT=0, lastRecord=null;
+let phase='idle', alignGood=0, alignStart=0;   // phase: idle | align | scan
+function stopCamera(){ if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;} try{video.pause();}catch(e){} video.srcObject=null; }
 
 /* ===================== DATA LAYER ===================== */
 const DB={
@@ -486,15 +488,40 @@ function sampleFrame(){
   const skinFrac=n/total;
   if(n<800||skinFrac<0.10) return {ok:false,skinFrac};
   const gm=g/n, motion=prevMean==null?0:Math.abs(gm-prevMean); prevMean=gm;
-  return {ok:true,r:r/n,g:gm,b:b/n,skinFrac,motion};
+  const bright=(r/n+g/n+b/n)/3;
+  return {ok:true,r:r/n,g:gm,b:b/n,skinFrac,motion,bright};
+}
+// real-time positioning guidance shown during a scan
+function guide(s){
+  if(!s||!s.ok){const sf=s?s.skinFrac:0;
+    return {ok:false,msg:sf<0.05?'Move closer — fill the oval':'Center your face in the oval'};}
+  if(s.skinFrac>0.82) return {ok:false,msg:'Move back a little'};
+  if(s.skinFrac<0.16) return {ok:false,msg:'Move a bit closer'};
+  if(s.bright<72)     return {ok:false,msg:'Find brighter light'};
+  if(s.bright>216)    return {ok:false,msg:'Too bright — reduce glare'};
+  if(s.motion>2.4)    return {ok:false,msg:'Hold still'};
+  return {ok:true,msg:''};
 }
 
 function loop(){
   if(!scanning) return;
   const now=performance.now();
   const s=sampleFrame();
-  if(s&&s.ok){samples.push({t:now,r:s.r,g:s.g,b:s.b});oval.className='oval good';hint.textContent='Scanning… stay still';}
-  else{oval.className='oval bad';hint.textContent='Center your face in the oval';}
+  const gd=guide(s);
+  oval.className='oval '+(gd.ok?'good':'bad');
+  if(phase==='align'){
+    hint.textContent=gd.ok?'Hold there… starting':gd.msg;
+    if(gd.ok)alignGood++; else alignGood=Math.max(0,alignGood-2);
+    // begin the timed scan after ~0.4s of good alignment (or 12s fallback so it never hangs)
+    if(alignGood>=12 || now-alignStart>12000){
+      phase='scan';startT=now;samples=[];prevMean=null;
+      ring.classList.remove('hidden');liveq.classList.add('on');startBtn.textContent='Scanning…';
+    }
+    raf=requestAnimationFrame(loop);return;
+  }
+  // phase === 'scan'
+  if(s&&s.ok)samples.push({t:now,r:s.r,g:s.g,b:s.b});
+  hint.textContent=gd.ok?'Scanning… hold still':gd.msg;
   const elapsed=(now-startT)/1000, remain=Math.max(0,SCAN_SECONDS-elapsed);
   ringT.textContent=Math.ceil(remain); ringArc.style.strokeDashoffset=150.8*(remain/SCAN_SECONDS);
   if(elapsed>6){
@@ -852,18 +879,20 @@ let beatTimer=null;
 async function start(){
   if(scanning)return;
   if(!DB.consented()){$('consentOv').classList.remove('hidden');return;}
-  if(!stream){const ok=await initCamera();if(!ok)return;}
-  samples=[];prevMean=null;scanning=true;startT=performance.now();
-  startBtn.textContent='Scanning…';startBtn.disabled=true;ring.classList.remove('hidden');liveq.classList.add('on');
+  startBtn.textContent='Starting…';startBtn.disabled=true;
+  if(!stream){const ok=await initCamera();if(!ok){startBtn.textContent='Start Scan';startBtn.disabled=false;return;}}
+  samples=[];prevMean=null;scanning=true;phase='align';alignGood=0;alignStart=performance.now();
+  startBtn.textContent='Aligning…';ring.classList.add('hidden');liveq.classList.remove('on');
   $('hr').textContent='—';MEASURED_TILES.forEach(t=>$('m_'+t.k).textContent='—');DERIVED_TILES.forEach(t=>$('d_'+t.k).textContent='—');
   $('refbox').classList.add('hidden');
   beatTimer=setInterval(()=>{const hr=parseInt($('hr').textContent);if(hr){pulsedot.style.animation='ping .6s ease-out';setTimeout(()=>pulsedot.style.animation='',600);}},700);
   raf=requestAnimationFrame(loop);
 }
 function finish(){
-  scanning=false;cancelAnimationFrame(raf);clearInterval(beatTimer);liveq.classList.remove('on');
-  startBtn.textContent='Scan Again';startBtn.disabled=false;oval.className='oval';
-  hint.textContent='Done — results below';
+  scanning=false;phase='idle';cancelAnimationFrame(raf);clearInterval(beatTimer);liveq.classList.remove('on');
+  stopCamera();
+  startBtn.textContent='Scan Again';startBtn.disabled=false;oval.className='oval';ring.classList.add('hidden');
+  hint.textContent='Done — camera off · results below';
   const e=estimate(samples);
   if(e&&e.bpm){const prof=getProfile(),b=deriveBiomarkers(e,prof);
     setHero(e);drawWave(e.pulse);setMetrics(e,b);
@@ -875,7 +904,8 @@ function finish(){
   } else hint.textContent='Could not lock a signal — try better lighting & stay still';
 }
 function reset(){
-  scanning=false;cancelAnimationFrame(raf);clearInterval(beatTimer);samples=[];liveq.classList.remove('on');
+  scanning=false;phase='idle';cancelAnimationFrame(raf);clearInterval(beatTimer);samples=[];liveq.classList.remove('on');
+  stopCamera();
   startBtn.textContent='Start Scan';startBtn.disabled=false;ring.classList.add('hidden');oval.className='oval';
   hint.textContent='Tap Start, then fill the oval with your face';
   wctx.clearRect(0,0,wave.width,wave.height);
@@ -888,6 +918,15 @@ function reset(){
 }
 startBtn.addEventListener('click',start);
 resetBtn.addEventListener('click',reset);
+// privacy/battery: never leave the camera running if the app is hidden/backgrounded
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    if(scanning){scanning=false;phase='idle';cancelAnimationFrame(raf);clearInterval(beatTimer);
+      liveq.classList.remove('on');ring.classList.add('hidden');oval.className='oval';
+      startBtn.textContent='Scan Again';startBtn.disabled=false;hint.textContent='Scan paused — tap to rescan';}
+    stopCamera();
+  }
+});
 
 /* ===================== BOOT + PWA ===================== */
 window.addEventListener('load',()=>{wave.width=wave.offsetWidth;});
