@@ -1,5 +1,5 @@
 // Vytaly service worker — offline app shell
-const CACHE = 'vytaly-v4';
+const CACHE = 'vytaly-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -17,11 +17,25 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const isHTML = e.request.mode === 'navigate' ||
+    (e.request.headers.get('accept') || '').includes('text/html');
+  if (isHTML) {
+    // network-first for the app shell so updates land immediately, offline falls back to cache
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put('./index.html', copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+  // cache-first for static assets
   e.respondWith(
     caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
       return res;
-    }).catch(() => caches.match('./index.html')))
+    }))
   );
 });

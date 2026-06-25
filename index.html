@@ -144,6 +144,30 @@
   .ovbtns{display:flex;gap:10px;margin-top:14px}
   .logomark{width:64px;height:64px;margin:0 auto 14px;display:block}
   @keyframes ping{0%{transform:scale(.8);opacity:1}100%{transform:scale(2.2);opacity:0}}
+
+  /* metric gauges */
+  .card.hero{flex-direction:column;align-items:stretch}
+  .hero-row{display:flex;justify-content:space-between;align-items:flex-end;width:100%}
+  .metric{cursor:pointer}
+  .m-top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+  .status{font-size:9px;font-weight:800;letter-spacing:.2px;padding:3px 7px;border-radius:6px;white-space:nowrap;display:inline-block}
+  .gauge{position:relative;height:7px;border-radius:5px;margin-top:11px;background:var(--line)}
+  .gauge .gm{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;border:2px solid #0e1424;
+    transform:translate(-50%,-50%);left:0;opacity:0;transition:left .5s cubic-bezier(.4,1.3,.5,1),background .3s;
+    box-shadow:0 0 0 1px rgba(255,255,255,.3),0 1px 4px rgba(0,0,0,.5)}
+  .m-ends{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:5px}
+  .m-info{font-size:10.5px;color:var(--muted);line-height:1.5;max-height:0;overflow:hidden;transition:max-height .28s ease;opacity:.0}
+  .m-info.show{max-height:90px;margin-top:9px;opacity:1}
+  .metric .val{font-size:23px}
+
+  /* wellness gauge card */
+  .wellness-card{background:linear-gradient(150deg,#10202f,#0c1322);border-color:#1c3a3a;text-align:center;
+    padding:18px 16px 16px;margin-top:6px}
+  .wlabel{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700}
+  .wgauge{width:100%;max-width:250px;margin:6px auto 0;display:block}
+  .wscore{font-size:46px;font-weight:800;line-height:.9;margin-top:-26px}
+  .wstatus{font-size:15px;font-weight:700;margin-top:8px;color:var(--muted)}
+  .whint{font-size:10.5px;color:var(--muted);margin-top:12px;opacity:.85}
 </style>
 </head>
 <body>
@@ -194,19 +218,40 @@
     </div>
   </details>
 
+  <!-- Overall Wellness gauge -->
+  <div class="card wellness-card" id="wellnessCard">
+    <div class="wlabel">Overall Wellness</div>
+    <svg class="wgauge" viewBox="0 0 220 124">
+      <defs><linearGradient id="wgrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#f87171"/><stop offset="0.5" stop-color="#fbbf24"/><stop offset="1" stop-color="#34d399"/>
+      </linearGradient></defs>
+      <path d="M22 110 A 88 88 0 0 1 198 110" fill="none" stroke="#1e2940" stroke-width="15" stroke-linecap="round"/>
+      <path d="M22 110 A 88 88 0 0 1 198 110" fill="none" stroke="url(#wgrad)" stroke-width="15" stroke-linecap="round"/>
+      <line id="wneedle" x1="110" y1="110" x2="110" y2="36" stroke="#eaf0fb" stroke-width="4" stroke-linecap="round" transform="rotate(-90 110 110)"/>
+      <circle cx="110" cy="110" r="7" fill="#eaf0fb"/>
+    </svg>
+    <div class="wscore"><span id="wScore">—</span></div>
+    <div class="wstatus" id="wStatus">Run a scan to see your score</div>
+    <div class="whint">Tap any metric below to learn what it means</div>
+  </div>
+
   <div class="sec-h"><span>Measured from your pulse</span><span class="pill real">✓ REAL rPPG</span><span class="line"></span></div>
   <div class="grid">
     <div class="card hero">
-      <div>
-        <div class="lbl">Heart Rate</div>
-        <div><span class="val" id="hr">—</span><span class="unit">bpm</span></div>
-        <div class="sub" id="hrSub">Measured directly from blood flow</div>
+      <div class="hero-row">
+        <div>
+          <div class="lbl">Heart Rate</div>
+          <div><span class="val" id="hr">—</span><span class="unit">bpm</span> <span class="status" id="st_hero_bpm"></span></div>
+          <div class="sub" id="hrSub">Measured directly from blood flow</div>
+        </div>
+        <div style="text-align:right">
+          <div class="lbl">Signal</div>
+          <div class="val" id="qTxt" style="font-size:16px">—</div>
+          <div class="q-bar" style="width:74px;margin-left:auto"><div class="q-fill" id="qFill"></div></div>
+        </div>
       </div>
-      <div style="text-align:right">
-        <div class="lbl">Signal Quality</div>
-        <div class="val" id="qTxt" style="font-size:18px">—</div>
-        <div class="q-bar"><div class="q-fill" id="qFill"></div></div>
-      </div>
+      <div class="gauge" id="g_hero_bpm" style="margin-top:14px"><i class="gm" id="gm_hero_bpm"></i></div>
+      <div class="m-ends"><span id="ge0_hero_bpm"></span><span id="ge1_hero_bpm"></span></div>
     </div>
   </div>
   <div class="grid" id="measuredGrid" style="margin-top:11px"></div>
@@ -234,14 +279,6 @@
     <div id="histList"><div class="empty">No scans yet — run your first scan above.</div></div>
   </div>
 
-  <div class="note">
-    <b>Honest by design.</b> The <b style="color:var(--green)">green</b> metrics are genuinely measured —
-    your pulse is extracted with the <b>POS algorithm</b> (a research-grade rPPG method that combines the red, green
-    and blue channels to cancel motion and lighting noise) from skin-only pixels. The <b style="color:var(--amber)">amber</b>
-    metrics are derived from that pulse with standard physiological formulas (directional, not clinical).
-    <b>Not shown yet:</b> blood pressure, glucose, SpO₂, hemoglobin — those need trained AI models (<b>Phase 2</b>).
-    We will never display a made-up medical number.
-  </div>
   <div class="disclaimer">
     Not a medical device. Demonstration only — do not use for any health decision.<br>
     Everything (video, profiles, history) stays on this device. Cloud accounts come in Phase 2.
@@ -531,7 +568,7 @@ function deriveBiomarkers(e,prof){
   return o;
 }
 
-/* ===================== TILES ===================== */
+/* ===================== TILES + RANGES (graphic scales) ===================== */
 const MEASURED_TILES=[
   {k:'sdnn',lbl:'HRV (SDNN)',u:'ms'},{k:'rmssd',lbl:'HRV (RMSSD)',u:'ms'},
   {k:'rr',lbl:'Respiratory Rate',u:'/min'},{k:'meanIBI',lbl:'Mean Beat Interval',u:'ms'},
@@ -542,15 +579,86 @@ const DERIVED_TILES=[
   {k:'sns',lbl:'Sympathetic',u:'/10',need:''},{k:'ans',lbl:'ANS Balance',u:'',need:''},
   {k:'prq',lbl:'Pulse-Resp Quotient',u:'',need:''},{k:'fatigue',lbl:'Fatigue Index',u:'/100',need:''},
   {k:'vo2',lbl:'VO₂ Max',u:'',need:'age'},{k:'bioAge',lbl:'Biological Age',u:'yrs',need:'age'},
-  {k:'bmi',lbl:'Body Mass Index',u:'',need:'height + weight'},{k:'wellness',lbl:'Wellness Score',u:'/100',need:''},
+  {k:'bmi',lbl:'Body Mass Index',u:'',need:'height + weight'},
 ];
+const COL={green:'#34d399',teal:'#00e5a8',amber:'#fbbf24',red:'#f87171',grey:'#7e8aa3'};
+// zones: [upperBound, color, statusLabel] — value falls in the first zone it is <=
+const RANGES={
+  bpm:{min:40,max:120,zones:[[50,'amber','Low'],[70,'green','Excellent'],[85,'teal','Good'],[100,'amber','Elevated'],[9999,'red','High']],info:'Resting heart rate. A lower rate (50–70) usually reflects a fitter, more efficient heart.'},
+  sdnn:{min:0,max:120,zones:[[20,'red','Low'],[40,'amber','Fair'],[70,'green','Good'],[9999,'teal','Excellent']],info:'Overall heart-rate variability. Higher = better stress resilience & recovery. Naturally declines with age.'},
+  rmssd:{min:0,max:100,zones:[[20,'red','Low'],[40,'amber','Fair'],[60,'green','Good'],[9999,'teal','Excellent']],info:'Short-term HRV tied to your “rest & recover” nervous system. Higher is generally better.'},
+  rr:{min:5,max:30,zones:[[9,'amber','Low'],[20,'green','Normal'],[25,'amber','Elevated'],[9999,'red','High']],info:'Breaths per minute at rest. 12–20 is a typical healthy range.'},
+  meanIBI:{min:500,max:1200,zones:[[650,'amber','Fast'],[1000,'green','Healthy'],[9999,'amber','Slow']],info:'Average time between beats — mirrors heart rate (~830–1000ms ≈ a calm 60–72 bpm).'},
+  pnn50:{min:0,max:50,zones:[[5,'amber','Low'],[15,'green','Fair'],[30,'green','Good'],[9999,'teal','Excellent']],info:'How often beat-to-beat timing shifts >50ms — a marker of recovery (parasympathetic) activity.'},
+  stress:{min:0,max:100,zones:[[30,'green','Calm'],[50,'teal','Balanced'],[70,'amber','Elevated'],[9999,'red','High']],info:'Estimated physiological stress from your HRV. Lower is calmer.'},
+  pns:{min:0,max:10,zones:[[3,'amber','Low'],[6,'green','Good'],[9999,'teal','High']],info:'Parasympathetic (“rest & digest”) activity. Higher supports recovery.'},
+  sns:{min:0,max:10,zones:[[4,'green','Calm'],[7,'amber','Active'],[9999,'red','High']],info:'Sympathetic (“fight or flight”) activity. At rest, lower is calmer.'},
+  ans:{min:0,max:2,zones:[[1,'amber','Activated'],[2,'green','Recovery']],info:'Balance between your recovery and activation systems right now.'},
+  prq:{min:2,max:8,zones:[[3,'amber','Low'],[6,'green','Healthy'],[9999,'amber','High']],info:'Pulse-to-respiration ratio. ~4–5 is a typical healthy balance.'},
+  fatigue:{min:0,max:100,zones:[[30,'green','Fresh'],[60,'amber','Moderate'],[9999,'red','High']],info:'Estimated fatigue from heart rate + HRV. Lower means more recovered.'},
+  vo2:{min:15,max:70,zones:[[30,'red','Low'],[40,'amber','Fair'],[50,'green','Good'],[9999,'teal','Excellent']],info:'Estimated aerobic fitness (VO₂ max). Higher = fitter. Strongly age & sex dependent.'},
+  bioAge:{min:16,max:95,info:'Estimated biological age from your pulse vs your real age. Lower than your real age is great.'},
+  bmi:{min:15,max:40,zones:[[18.5,'amber','Under'],[25,'green','Healthy'],[30,'amber','Over'],[9999,'red','High']],info:'Body Mass Index from height & weight. 18.5–25 is the standard healthy band.'},
+};
+function gradFor(R){const span=(R.max-R.min)||1;let prev=R.min,parts=[];
+  R.zones.forEach(z=>{const up=Math.min(z[0],R.max);const a=(prev-R.min)/span*100,b=(up-R.min)/span*100;
+    parts.push(COL[z[1]]+' '+a.toFixed(1)+'%',COL[z[1]]+' '+b.toFixed(1)+'%');prev=up;});
+  return 'linear-gradient(90deg,'+parts.join(',')+')';}
+function classify(k,value,profile){
+  const R=RANGES[k];
+  if(k==='ans'){const rec=value==='Recovery';return{pct:rec?78:28,color:rec?'green':'amber',label:value};}
+  if(k==='bioAge'){const a=(profile&&profile.age)||value,d=value-a,min=a-12,max=a+12;
+    const pct=clamp((value-min)/(max-min)*100,0,100),color=d<=0?'green':d<=5?'amber':'red';
+    const label=d<0?Math.abs(d)+'y younger':d===0?'On par':'+'+d+'y older';
+    return{pct,color,label,grad:`linear-gradient(90deg,${COL.green} 0%,${COL.green} 42%,${COL.amber} 58%,${COL.amber} 78%,${COL.red} 90%)`};}
+  const z=R.zones.find(zz=>value<=zz[0])||R.zones[R.zones.length-1];
+  return{pct:clamp((value-R.min)/(R.max-R.min)*100,0,100),color:z[1],label:z[2]};
+}
+function paintMetric(p,k,value,profile){
+  const id=p+'_'+k,track=$('g_'+id),mark=$('gm_'+id),st=$('st_'+id),inf=$('info_'+id),e0=$('ge0_'+id),e1=$('ge1_'+id),R=RANGES[k];
+  if(inf&&R)inf.textContent=R.info;
+  const blank=(value==null||value===''||(typeof value==='number'&&Number.isNaN(value)));
+  if(!R||blank){if(st){st.textContent='';st.style.background='transparent';}if(track)track.style.background='var(--line)';
+    if(mark)mark.style.opacity=0;if(e0)e0.textContent='';if(e1)e1.textContent='';return;}
+  const cls=classify(k,value,profile);
+  if(track)track.style.background=cls.grad||R._grad||(R._grad=gradFor(R));
+  if(mark){mark.style.opacity=1;mark.style.left=cls.pct+'%';mark.style.background=COL[cls.color];}
+  if(st){st.textContent=cls.label;st.style.color=COL[cls.color];st.style.background=COL[cls.color]+'22';}
+  const lo=(k==='bioAge'&&profile&&profile.age)?(profile.age-12):R.min, hi=(k==='bioAge'&&profile&&profile.age)?(profile.age+12):R.max;
+  if(e0)e0.textContent=lo;if(e1)e1.textContent=hi;
+}
+function tileHTML(p,t){
+  const id=p+'_'+t.k;
+  return `<div class="card metric" data-k="${t.k}">
+    <div class="m-top"><span class="lbl">${t.lbl}</span><span class="status" id="st_${id}"></span></div>
+    <div><span class="val" id="${p}_${t.k}">—</span><span class="unit">${t.u}</span></div>
+    <div class="gauge" id="g_${id}"><i class="gm" id="gm_${id}"></i></div>
+    <div class="m-ends"><span id="ge0_${id}"></span><span id="ge1_${id}"></span></div>
+    <div class="m-info" id="info_${id}"></div>
+    ${t.need?`<div class="sub" id="need_${id}"></div>`:''}</div>`;
+}
 function buildGrids(){
-  $('measuredGrid').innerHTML=MEASURED_TILES.map(t=>
-    `<div class="card"><div class="lbl">${t.lbl}</div><div><span class="val" id="m_${t.k}">—</span><span class="unit">${t.u}</span></div></div>`).join('');
-  $('derivedGrid').innerHTML=DERIVED_TILES.map(t=>
-    `<div class="card"><div class="lbl">${t.lbl}</div><div><span class="val" id="d_${t.k}">—</span><span class="unit">${t.u}</span></div>${t.need?`<div class="sub" id="need_${t.k}"></div>`:''}</div>`).join('');
+  $('measuredGrid').innerHTML=MEASURED_TILES.map(t=>tileHTML('m',t)).join('');
+  $('derivedGrid').innerHTML=DERIVED_TILES.map(t=>tileHTML('d',t)).join('');
+  // seed info text + tap to expand explanation
+  MEASURED_TILES.forEach(t=>{const i=$('info_m_'+t.k);if(i&&RANGES[t.k])i.textContent=RANGES[t.k].info;});
+  DERIVED_TILES.forEach(t=>{const i=$('info_d_'+t.k);if(i&&RANGES[t.k])i.textContent=RANGES[t.k].info;});
+  document.querySelectorAll('.metric').forEach(c=>c.addEventListener('click',()=>{
+    const inf=c.querySelector('.m-info');if(inf)inf.classList.toggle('show');}));
 }
 buildGrids();
+
+let _lastWell=0;
+function renderWellness(score){
+  const el=$('wScore'),stt=$('wStatus'),ndl=$('wneedle');
+  if(score==null){el.textContent='—';el.style.color='var(--txt)';stt.textContent='Run a scan to see your score';stt.style.color='var(--muted)';ndl.setAttribute('transform','rotate(-90 110 110)');_lastWell=0;return;}
+  const s=score>=80?['Excellent','green']:score>=60?['Good','teal']:score>=40?['Fair','amber']:['Needs care','red'];
+  stt.textContent=s[0];stt.style.color=COL[s[1]];el.style.color=COL[s[1]];
+  const from=_lastWell,t0=performance.now();
+  (function step(t){const k=Math.min(1,(t-t0)/750),cur=from+(score-from)*k;
+    el.textContent=Math.round(cur);ndl.setAttribute('transform','rotate('+(-90+cur/100*180)+' 110 110)');
+    if(k<1)requestAnimationFrame(step);else _lastWell=score;})(t0);
+}
 
 function drawWave(sig){
   if(!sig||!sig.length)return;
@@ -570,9 +678,12 @@ function setHero(e){
   $('hrSub').textContent=e.quality>0.6?'Strong pulse signal (POS)':'Hold stiller / better light for accuracy';
 }
 function setMetrics(e,b){
-  MEASURED_TILES.forEach(t=>{const v=e[t.k];$('m_'+t.k).textContent=(v==null||Number.isNaN(v))?'—':v;});
-  DERIVED_TILES.forEach(t=>{const v=b[t.k];$('d_'+t.k).textContent=(v==null||v==='')?'—':v;
-    const ne=$('need_'+t.k);if(ne)ne.textContent=(v==null)?('add '+t.need+' ↑'):'';});
+  const prof=getProfile();
+  paintMetric('hero','bpm',e.bpm,prof);
+  MEASURED_TILES.forEach(t=>{const v=e[t.k];$('m_'+t.k).textContent=(v==null||Number.isNaN(v))?'—':v;paintMetric('m',t.k,v,prof);});
+  DERIVED_TILES.forEach(t=>{const v=b[t.k];$('d_'+t.k).textContent=(v==null||v==='')?'—':v;paintMetric('d',t.k,v,prof);
+    const ne=$('need_d_'+t.k);if(ne)ne.textContent=(v==null)?('add '+t.need+' ↑'):'';});
+  renderWellness(b.wellness);
 }
 
 /* ===================== HISTORY + EXPORT (Track 3) ===================== */
@@ -671,7 +782,10 @@ function reset(){
   hint.textContent='Tap Start, then fill the oval with your face';
   wctx.clearRect(0,0,wave.width,wave.height);
   $('hr').textContent='—';$('qFill').style.width='0';$('qTxt').textContent='—';
-  MEASURED_TILES.forEach(t=>$('m_'+t.k).textContent='—');DERIVED_TILES.forEach(t=>$('d_'+t.k).textContent='—');
+  paintMetric('hero','bpm',null,null);
+  MEASURED_TILES.forEach(t=>{$('m_'+t.k).textContent='—';paintMetric('m',t.k,null,null);});
+  DERIVED_TILES.forEach(t=>{$('d_'+t.k).textContent='—';paintMetric('d',t.k,null,null);});
+  renderWellness(null);
 }
 startBtn.addEventListener('click',start);
 resetBtn.addEventListener('click',reset);
