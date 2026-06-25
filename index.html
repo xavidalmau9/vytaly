@@ -610,6 +610,8 @@ function resample(sig,times,fs){
 }
 const mean=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
 const std=a=>{const m=mean(a);return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/(a.length||1));};
+const median=a=>{const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+const clp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const detrend=x=>{const m=mean(x);return x.map(v=>v-m);};
 function movingAvg(x,w){const out=[];for(let i=0;i<x.length;i++){let s=0,c=0;for(let k=-w;k<=w;k++){const j=i+k;if(j>=0&&j<x.length){s+=x[j];c++;}}out.push(s/c);}return out;}
 function bandpass(x,fs,lo,hi){const wHi=Math.round(fs/lo),wLo=Math.max(1,Math.round(fs/hi/2));const base=movingAvg(x,wHi);const hp=x.map((v,i)=>v-base[i]);return movingAvg(hp,wLo);}
@@ -659,7 +661,8 @@ function estimate(raw){
   const pk=peaks(pulse); let sdnn=null,rmssd=null,pnn50=null,meanIBI=null;
   if(pk.length>4){
     const ibi=[];for(let i=1;i<pk.length;i++)ibi.push((pk[i]-pk[i-1])/FS_TARGET*1000);
-    const f=ibi.filter(v=>v>300&&v<1500);
+    let f=ibi.filter(v=>v>300&&v<1500);
+    if(f.length>3){const md=median(f); f=f.filter(v=>v>md*0.72&&v<md*1.4);}  // robust: reject beats far from the median interval
     if(f.length>3){
       meanIBI=Math.round(mean(f)); sdnn=Math.round(std(f));
       let sq=0,nn=0;for(let i=1;i<f.length;i++){const dd=f[i]-f[i-1];sq+=dd*dd;if(Math.abs(dd)>50)nn++;}
@@ -675,8 +678,14 @@ function estimate(raw){
       const rise=p-t0,fall=t1-p,tot=rise+fall;
       if(tot>2&&rise>0&&fall>0)rs.push(rise/tot);}
     if(rs.length)riseFrac=+(rs.reduce((x,y)=>x+y,0)/rs.length).toFixed(3);}
-  const quality=Math.max(0,Math.min(1,(hrBand.snr-1)/6));
-  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,riseFrac,pulse,quality,
+  // confidence = signal strength (SNR) blended with heart-rate stability across the scan (split-half)
+  const half=Math.floor(pulse.length/2);
+  const hr1=dominantFreq(pulse.slice(0,half),FS_TARGET,0.7,3.0,0.02).freq*60;
+  const hr2=dominantFreq(pulse.slice(half),FS_TARGET,0.7,3.0,0.02).freq*60;
+  const cons=clp(1-Math.abs(hr1-hr2)/14,0,1);            // HR consistent across halves → stable signal
+  const snrQ=clp((hrBand.snr-1)/6,0,1);
+  const quality=clp(snrQ*(0.25+0.75*cons),0,1);          // an unstable (drifting) HR tanks confidence even if SNR is high
+  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,riseFrac,pulse,quality,hrDrift:Math.round(Math.abs(hr1-hr2)),
     fps:Math.round(G.length/((times[times.length-1]-times[0])/1000)),frames:raw.length};
 }
 
@@ -855,7 +864,8 @@ function renderSummary(e,b){
   if(good.length)html+=`Looking healthy: ${good.slice(0,4).join(', ')}. `;
   if(watch.length)html+=`<span style="color:var(--amber)">Worth attention: ${watch.slice(0,3).join(', ')}.</span> `;
   else if(good.length)html+=`Everything measured sits in a healthy range — nice work. `;
-  if(e.quality<0.35)html+=`<br><span style="color:var(--red)">⚠ Signal quality was low this scan — lighting or movement may have skewed the numbers. Rescan in steady, bright light for reliable results.</span>`;
+  if(e.quality<0.35)html+=`<br><span style="color:var(--red)">⚠ Low signal quality — this scan was <b>not saved to your history</b>. Hold still in steady, bright light and rescan for reliable numbers.</span>`;
+  else if(e.quality<0.6)html+=`<br><span style="color:var(--amber)">Medium confidence — for the steadiest numbers, scan in bright light holding still.</span>`;
   el.innerHTML=html;
 }
 
@@ -915,9 +925,10 @@ function drawWave(sig){
 function setHero(e){
   $('hr').textContent=e.bpm||'—';
   const conf=Math.round(e.quality*100),qt=$('qTxt'),qf=$('qFill');qf.style.width=conf+'%';
-  if(e.quality>0.6){qt.textContent='Good';qt.style.color='var(--green)';qf.style.background='var(--green)';}
-  else if(e.quality>0.3){qt.textContent='Fair';qt.style.color='var(--amber)';qf.style.background='var(--amber)';}
-  else{qt.textContent='Low';qt.style.color='var(--red)';qf.style.background='var(--red)';}
+  const stars=e.quality>0.75?'★★★★★':e.quality>0.6?'★★★★':e.quality>0.45?'★★★':e.quality>0.3?'★★':'★';
+  if(e.quality>0.6){qt.textContent='Good '+stars;qt.style.color='var(--green)';qf.style.background='var(--green)';}
+  else if(e.quality>0.3){qt.textContent='Fair '+stars;qt.style.color='var(--amber)';qf.style.background='var(--amber)';}
+  else{qt.textContent='Low '+stars;qt.style.color='var(--red)';qf.style.background='var(--red)';}
   $('hrSub').textContent=e.quality>0.6?'Strong pulse signal (POS)':'Hold stiller / better light for accuracy';
 }
 function setMetrics(e,b){
@@ -1019,7 +1030,9 @@ function finish(){
     lastScanFeat={hr:e.bpm,rf:e.riseFrac};
     lastRecord=buildRecord(e,b,prof);
     const _cal=getBPCal();if(_cal)lastRecord.bp=estimateBP(lastScanFeat,_cal);
-    saveScan(lastRecord);renderBP();
+    // quality gate: only keep trustworthy scans in history so trends don't bounce on noise
+    if(e.quality>=0.35) saveScan(lastRecord);
+    renderBP();
     $('refMsg').textContent='📏 Check accuracy — enter a reference HR from a watch/oximeter:';
     $('refInput').value='';$('refInput').classList.remove('hidden');$('refSave').classList.remove('hidden');
     $('refbox').classList.remove('hidden');
