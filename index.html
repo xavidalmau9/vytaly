@@ -190,6 +190,16 @@
   .bp-note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:8px}
   .bp-note b{color:var(--txt)}
   #bpVal{font-size:34px;font-weight:800}
+  .redo-banner{margin-top:14px;background:rgba(248,113,113,.10);border:1px solid rgba(248,113,113,.5);
+    border-radius:14px;padding:14px 16px;font-size:12.5px;line-height:1.55;color:#fecaca}
+  .redo-banner b{color:#fff}
+  .optin{display:flex;gap:9px;align-items:flex-start;margin:4px 0 16px;font-size:12px;color:var(--muted);line-height:1.45;cursor:pointer}
+  .optin input{margin-top:2px;width:16px;height:16px;flex:0 0 auto}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--txt);padding:4px 0}
+  .toggle-row .sw{width:42px;height:24px;border-radius:13px;background:var(--line);position:relative;transition:background .2s;flex:0 0 auto}
+  .toggle-row .sw.on{background:var(--accent)}
+  .toggle-row .sw i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
+  .toggle-row .sw.on i{left:20px}
 </style>
 </head>
 <body>
@@ -228,6 +238,8 @@
     <button class="ghost" id="resetBtn" title="Reset">↺</button>
   </div>
 
+  <div id="redoBanner" class="redo-banner hidden"></div>
+
   <canvas class="wave" id="wave" width="480" height="64"></canvas>
 
   <details class="profile" id="profile">
@@ -237,6 +249,7 @@
       <div class="field"><label>Sex</label><select id="pSex"><option value="">—</option><option value="m">Male</option><option value="f">Female</option></select></div>
       <div class="field"><label>Height (cm)</label><input id="pHt" type="number" inputmode="numeric" placeholder="175"></div>
       <div class="field"><label>Weight (kg)</label><input id="pWt" type="number" inputmode="numeric" placeholder="75"></div>
+      <div class="field full"><div class="toggle-row" id="contribRow"><span>Contribute anonymized scans to improve Vytaly</span><span class="sw" id="contribSw"><i></i></span></div></div>
     </div>
   </details>
 
@@ -345,6 +358,7 @@
       <li><b>Your profile & history</b> stay in this browser, on this device only.</li>
       <li>Vytaly is <b>not a medical device</b> and does not diagnose. It surfaces trends — always see a clinician for medical concerns.</li>
     </ul>
+    <label class="optin"><input type="checkbox" id="optinContribute"><span>Optionally contribute my <b>anonymized</b> scans to help improve Vytaly's accuracy. You can change this anytime in your profile.</span></label>
     <button class="primary" id="consentBtn">I understand & agree</button>
   </div>
 </div>
@@ -384,7 +398,12 @@
 
 <script>
 const $=id=>document.getElementById(id);
-const APP_VER='vytaly-poc/0.4';
+const APP_VER='vytaly-poc/0.6';
+// ===== Data contribution (opt-in) — paste your deployed Apps Script values to enable =====
+const UPLOAD_URL='';   // ← your Apps Script web-app /exec URL
+const WRITE_KEY='';    // ← the WRITE_KEY you set in the Apps Script
+function contributing(){return localStorage.getItem('vs_contribute')==='1';}
+function syncContributeToggle(){const sw=document.getElementById('contribSw');if(sw)sw.classList.toggle('on',contributing());}
 const video=$('video'), proc=$('proc'), pctx=proc.getContext('2d',{willReadFrequently:true});
 const oval=$('oval'), hint=$('hint');
 const startBtn=$('startBtn'), resetBtn=$('resetBtn');
@@ -454,7 +473,9 @@ function persistProfileEdits(){
 ['pAge','pSex','pHt','pWt'].forEach(k=>$(k).addEventListener('change',persistProfileEdits));
 
 /* ===================== OVERLAYS ===================== */
-$('consentBtn').onclick=()=>{DB.setConsent();$('consentOv').classList.add('hidden');maybeOnboard();};
+$('consentBtn').onclick=()=>{DB.setConsent();
+  if($('optinContribute')&&$('optinContribute').checked)localStorage.setItem('vs_contribute','1');
+  $('consentOv').classList.add('hidden');maybeOnboard();syncContributeToggle();};
 function maybeOnboard(){ if(!DB.onboarded() && DB.users().length===0) openPeople(); }
 function openPeople(){
   $('peopleOv').classList.remove('hidden');
@@ -913,6 +934,21 @@ function renderBP(){
 }
 $('bpCalBtn').onclick=openBPForm;$('bpCancel').onclick=closeBPForm;$('bpSaveCal').onclick=saveBPCal;
 
+/* ===================== CONTRIBUTE (opt-in upload to shared dataset) ===================== */
+function uploadScan(rec){
+  if(!UPLOAD_URL || !WRITE_KEY || !contributing() || !rec) return;
+  const p=activePerson();
+  const scan={
+    sid:rec.ts, pid:p.id, name:p.guest?'Guest':(p.name||''), email:p.guest?'':(p.email||''),
+    age:rec.profile&&rec.profile.age, sex:rec.profile&&rec.profile.sex,
+    bpm:rec.bpm, sdnn:rec.sdnn, rmssd:rec.rmssd, rr:rec.rr, pnn50:rec.pnn50,
+    stress:rec.stress, wellness:rec.wellness, quality:rec.q,
+    bpSys:rec.bp?rec.bp.sbp:'', bpDia:rec.bp?rec.bp.dbp:'', refHR:rec.refHR||'',
+    ua:navigator.userAgent, appVersion:APP_VER
+  };
+  try{ fetch(UPLOAD_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:WRITE_KEY,scan})}); }catch(e){}
+}
+
 function drawWave(sig){
   if(!sig||!sig.length)return;
   const W=wave.width,H=wave.height; wctx.clearRect(0,0,W,H);
@@ -998,6 +1034,7 @@ $('refSave').onclick=()=>{
   lastRecord.refHR=v;
   const p=activePerson(); if(!p.guest){const h=DB.hist();const arr=h[p.id]||[];
     if(arr.length){arr[arr.length-1].refHR=v;DB.saveHist(h);}}
+  uploadScan(lastRecord);   // re-send with the reference HR filled in (dashboard dedupes by sid)
   const dlt=Math.abs(v-(lastRecord.bpm||0));
   $('refMsg').innerHTML=`Logged. Vytaly read <b style="color:var(--accent)">${lastRecord.bpm}</b>, ref <b>${v}</b> — off by <b style="color:${dlt<=5?'var(--green)':dlt<=10?'var(--amber)':'var(--red)'}">${dlt} bpm</b>. Thanks!`;
   $('refInput').classList.add('hidden');$('refSave').classList.add('hidden');
@@ -1015,31 +1052,39 @@ async function start(){
   samples=[];prevMean=null;scanning=true;phase='align';alignGood=0;alignStart=performance.now();
   startBtn.textContent='Aligning…';ring.classList.add('hidden');liveq.classList.remove('on');
   $('hr').textContent='—';MEASURED_TILES.forEach(t=>$('m_'+t.k).textContent='—');DERIVED_TILES.forEach(t=>$('d_'+t.k).textContent='—');
-  $('refbox').classList.add('hidden');
+  $('refbox').classList.add('hidden'); hideRedo();
+  renderWellness(null); if($('summaryText'))$('summaryText').textContent='Scanning…'; lastScanFeat=null; renderBP();
   beatTimer=setInterval(()=>{const hr=parseInt($('hr').textContent);if(hr){pulsedot.style.animation='ping .6s ease-out';setTimeout(()=>pulsedot.style.animation='',600);}},700);
   raf=requestAnimationFrame(loop);
 }
+function showRedo(reason){const b=$('redoBanner');if(!b)return;
+  b.innerHTML='<b>Let’s redo that scan.</b> '+reason+'<br><span style="opacity:.85">For a clean reading: bright, even light · hold still · face filling the oval · stay quiet through the countdown.</span>';
+  b.classList.remove('hidden');}
+function hideRedo(){const b=$('redoBanner');if(b)b.classList.add('hidden');}
 function finish(){
   scanning=false;phase='idle';cancelAnimationFrame(raf);clearInterval(beatTimer);liveq.classList.remove('on');
   stopCamera();
-  startBtn.textContent='Scan Again';startBtn.disabled=false;oval.className='oval';ring.classList.add('hidden');
-  hint.textContent='Done — camera off · results below';
+  startBtn.disabled=false;oval.className='oval';ring.classList.add('hidden');
   const e=estimate(samples);
-  if(e&&e.bpm){const prof=getProfile(),b=deriveBiomarkers(e,prof);
+  const ok = e && e.bpm && e.quality>=0.35;   // quality gate — junk scans force a redo, never shown/saved
+  if(ok){
+    const prof=getProfile(),b=deriveBiomarkers(e,prof);
     setHero(e);drawWave(e.pulse);setMetrics(e,b);
     lastScanFeat={hr:e.bpm,rf:e.riseFrac};
     lastRecord=buildRecord(e,b,prof);
     const _cal=getBPCal();if(_cal)lastRecord.bp=estimateBP(lastScanFeat,_cal);
-    // quality gate: only keep trustworthy scans in history so trends don't bounce on noise
-    if(e.quality>=0.35) saveScan(lastRecord);
-    renderBP();
+    saveScan(lastRecord); uploadScan(lastRecord); renderBP();
     $('refMsg').textContent='📏 Check accuracy — enter a reference HR from a watch/oximeter:';
     $('refInput').value='';$('refInput').classList.remove('hidden');$('refSave').classList.remove('hidden');
     $('refbox').classList.remove('hidden');
-    refreshPersonUI();
-    // collapse the big camera stage — results are below; keep only the Scan Again button
+    refreshPersonUI(); hideRedo();
+    hint.textContent='Done — camera off · results below';
     $('stage').classList.add('hidden');wave.classList.add('hidden');resetBtn.classList.add('hidden');
-  } else hint.textContent='Could not lock a signal — try better lighting & stay still';
+  } else {
+    startBtn.textContent='Redo Scan';
+    showRedo((e&&e.bpm)?'Too much movement or uneven light, so the numbers wouldn’t be reliable.':'No clear pulse was detected.');
+    hint.textContent='Low-quality scan — please redo';
+  }
 }
 function reset(){
   scanning=false;phase='idle';cancelAnimationFrame(raf);clearInterval(beatTimer);samples=[];liveq.classList.remove('on');
@@ -1072,6 +1117,8 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('load',()=>{wave.width=wave.offsetWidth; initFaceDetector();});
 $('refbox').classList.add('hidden');
 refreshPersonUI();
+{const cr=$('contribRow');if(cr)cr.onclick=()=>{localStorage.setItem('vs_contribute',contributing()?'0':'1');syncContributeToggle();};}
+syncContributeToggle();
 if(!DB.consented()) $('consentOv').classList.remove('hidden'); else maybeOnboard();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
 </script>

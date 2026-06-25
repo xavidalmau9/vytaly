@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vytaly · Admin Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23070b14'/%3E%3Cpath d='M16 50 L30 50 L37 50 L45 78 L53 22 L60 60 L65 46 L71 54 L84 54' stroke='%2300e5a8' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root{--bg:#070b14;--panel:#0e1424;--panel2:#131b2e;--line:#1e2940;--txt:#eaf0fb;--muted:#7e8aa3;--accent:#00e5a8;--accent2:#38bdf8;--amber:#fbbf24;--red:#f87171;--green:#34d399}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:radial-gradient(1200px 600px at 50% -10%,#0d1730,#070b14 60%);color:var(--txt);min-height:100vh;padding:24px 18px 60px}
+  .wrap{max-width:1080px;margin:0 auto}
+  header{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+  .logo{width:38px;height:38px;border-radius:10px;background:#0e1424;border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
+  .logo svg{width:24px;height:24px}
+  h1{font-size:20px;font-weight:800}
+  .tag{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+  button{padding:13px 18px;border-radius:12px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,var(--accent),#06b6d4);color:#04140f}
+  button.ghost{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+  input{background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:12px;font-size:14px;font-family:inherit;width:100%}
+  label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px}
+  .login{max-width:440px;margin:40px auto}
+  .login .row{margin-bottom:14px}
+  .err{color:var(--red);font-size:12px;margin-top:10px;min-height:16px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;margin-bottom:16px}
+  .kpi .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
+  .kpi .v{font-size:30px;font-weight:800;line-height:1}
+  .kpi .s{font-size:11px;color:var(--muted);margin-top:5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:13px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:7px 8px;border-bottom:1px solid var(--line)}
+  td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .bar-row{display:flex;align-items:center;gap:9px;margin-bottom:7px;font-size:12px}
+  .bar-row .lbl{width:64px;color:var(--muted);flex:0 0 auto}
+  .bar-row .track{flex:1;height:14px;background:var(--line);border-radius:7px;overflow:hidden}
+  .bar-row .fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+  .bar-row .n{width:34px;text-align:right;flex:0 0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:10px;flex-wrap:wrap}
+  .pill{font-size:11px;padding:5px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .hidden{display:none!important}
+  .muted{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 100 100"><path d="M16 50 L30 50 L37 50 L45 78 L53 22 L60 60 L65 46 L71 54 L84 54" stroke="#00e5a8" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div><h1>Vytaly Admin</h1></div>
+  </header>
+  <div class="tag">Scan database · accuracy · model-improvement dashboard</div>
+
+  <!-- Login -->
+  <div class="login card" id="login">
+    <h2>Sign in</h2>
+    <div class="row"><label>Apps Script endpoint (/exec URL)</label><input id="inUrl" placeholder="https://script.google.com/macros/s/…/exec"></div>
+    <div class="row"><label>Admin key</label><input id="inKey" type="password" placeholder="your ADMIN_KEY"></div>
+    <div style="display:flex;gap:10px"><button id="loginBtn">Sign in</button><button class="ghost" id="demoBtn">Preview with demo data</button></div>
+    <div class="err" id="loginErr"></div>
+    <div class="muted" style="margin-top:14px">Your endpoint + key are stored only in this browser. Data is fetched directly from your Google Sheet via the key-protected Apps Script.</div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dash" class="hidden">
+    <div class="topbar">
+      <div class="pill" id="srcPill">—</div>
+      <div style="display:flex;gap:9px"><button class="ghost" id="refreshBtn">↻ Refresh</button><button class="ghost" id="logoutBtn">Sign out</button></div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="card"><h2>Heart-rate distribution</h2><div id="hrHist"></div></div>
+      <div class="card"><h2>Scan quality</h2><div id="qHist"></div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><h2>Accuracy vs reference HR</h2><div id="accBox"></div></div>
+      <div class="card"><h2>People</h2><div id="peopleBox" style="max-height:280px;overflow:auto"></div></div>
+    </div>
+    <div class="card"><h2>Recent scans</h2><div style="overflow:auto"><table id="recentTbl"></table></div></div>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const LS_URL='vy_admin_url', LS_KEY='vy_admin_key';
+
+function jsonp(url){return new Promise((res,rej)=>{
+  const cb='vycb_'+Math.floor(Math.random()*1e9);
+  const s=document.createElement('script');
+  const to=setTimeout(()=>{cleanup();rej(new Error('Timed out — check the URL/key and that the script is deployed for "Anyone".'));},15000);
+  function cleanup(){clearTimeout(to);delete window[cb];if(s.parentNode)s.remove();}
+  window[cb]=d=>{cleanup();res(d);};
+  s.onerror=()=>{cleanup();rej(new Error('Could not reach the endpoint.'));};
+  s.src=url+(url.includes('?')?'&':'?')+'callback='+cb;
+  document.body.appendChild(s);
+});}
+
+async function load(url,key){
+  const base=url+(url.includes('?')?'&':'?')+'key='+encodeURIComponent(key);
+  const d=await jsonp(base);
+  if(!d||!d.ok) throw new Error(d&&d.error==='unauthorized'?'Wrong admin key.':'Server error.');
+  return d.rows||[];
+}
+
+// dedupe by sid, preferring the row that has a reference HR
+function dedupe(rows){
+  const m=new Map();
+  rows.forEach(r=>{const k=r.sid||(r.pid+'|'+r.ts);const ex=m.get(k);
+    if(!ex||( (r.refHR!=null&&r.refHR!=='') && !(ex.refHR!=null&&ex.refHR!=='') )) m.set(k,r);});
+  return [...m.values()];
+}
+const num=v=>{const n=parseFloat(v);return isNaN(n)?null:n;};
+
+function render(rowsRaw,src){
+  $('login').classList.add('hidden'); $('dash').classList.remove('hidden');
+  $('srcPill').textContent=src;
+  const rows=dedupe(rowsRaw);
+  const hrs=rows.map(r=>num(r.bpm)).filter(v=>v!=null);
+  const qs=rows.map(r=>num(r.quality)).filter(v=>v!=null);
+  const people=new Set(rows.map(r=>r.pid||r.name).filter(Boolean));
+  const refRows=rows.filter(r=>num(r.refHR)!=null && num(r.bpm)!=null);
+  const errs=refRows.map(r=>Math.abs(num(r.refHR)-num(r.bpm)));
+  const meanErr=errs.length?(errs.reduce((a,b)=>a+b,0)/errs.length):null;
+  const bpRows=rows.filter(r=>r.bpSys!=null&&r.bpSys!=='').length;
+  const avgQ=qs.length?Math.round(qs.reduce((a,b)=>a+b,0)/qs.length):null;
+  const hiQ=qs.length?Math.round(qs.filter(v=>v>=60).length/qs.length*100):0;
+
+  const kpi=(l,v,s)=>`<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||''}</div></div>`;
+  $('kpis').innerHTML=
+    kpi('Total scans',rows.length,'unique readings')+
+    kpi('People',people.size,'distinct profiles')+
+    kpi('Avg quality',avgQ!=null?avgQ+'%':'—',hiQ+'% high-confidence')+
+    kpi('Accuracy entries',refRows.length,'with reference HR')+
+    kpi('Mean HR error',meanErr!=null?('±'+meanErr.toFixed(1)+' bpm'):'—','vs cuff/watch')+
+    kpi('BP calibrations',bpRows,'scans with BP');
+
+  // histograms
+  const histHTML=(vals,bins,fmt)=>{
+    const counts=bins.map(()=>0);
+    vals.forEach(v=>{for(let i=0;i<bins.length;i++){if(v<bins[i][1]||i===bins.length-1){counts[i]++;break;}}});
+    const max=Math.max(1,...counts);
+    return bins.map((b,i)=>`<div class="bar-row"><span class="lbl">${fmt(b)}</span><span class="track"><span class="fill" style="width:${counts[i]/max*100}%"></span></span><span class="n">${counts[i]}</span></div>`).join('');
+  };
+  $('hrHist').innerHTML=hrs.length?histHTML(hrs,[[0,55],[55,65],[65,75],[75,85],[85,95],[95,999]],b=>b[1]===999?'95+':b[0]+'–'+b[1]):'<div class="muted">No data yet.</div>';
+  $('qHist').innerHTML=qs.length?histHTML(qs,[[0,35],[35,60],[60,80],[80,101]],b=>b[1]===101?'80+':b[0]+'–'+b[1]):'<div class="muted">No data yet.</div>';
+
+  // accuracy
+  if(refRows.length){
+    const within5=Math.round(errs.filter(e=>e<=5).length/errs.length*100);
+    const within10=Math.round(errs.filter(e=>e<=10).length/errs.length*100);
+    $('accBox').innerHTML=`<div style="font-size:13px;line-height:1.9">
+      Mean absolute error: <b style="color:var(--accent)">±${meanErr.toFixed(1)} bpm</b><br>
+      Within ±5 bpm: <b>${within5}%</b> · Within ±10 bpm: <b>${within10}%</b><br>
+      <span class="muted">From ${refRows.length} scans with a logged reference HR.</span></div>`;
+  } else $('accBox').innerHTML='<div class="muted">No reference HR logged yet. Ask testers to enter a watch/oximeter reading after scans.</div>';
+
+  // people
+  const byPid={};
+  rows.forEach(r=>{const k=r.name||r.pid||'—';(byPid[k]=byPid[k]||{n:0,q:[]});byPid[k].n++;const q=num(r.quality);if(q!=null)byPid[k].q.push(q);});
+  $('peopleBox').innerHTML=Object.keys(byPid).length?('<table><tr><th>Person</th><th>Scans</th><th>Avg Q</th></tr>'+
+    Object.entries(byPid).sort((a,b)=>b[1].n-a[1].n).map(([k,v])=>`<tr><td>${k}</td><td>${v.n}</td><td>${v.q.length?Math.round(v.q.reduce((a,b)=>a+b,0)/v.q.length)+'%':'—'}</td></tr>`).join('')+'</table>'):'<div class="muted">No people yet.</div>';
+
+  // recent
+  const recent=[...rows].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,15);
+  $('recentTbl').innerHTML='<tr><th>When</th><th>Person</th><th>HR</th><th>HRV</th><th>Stress</th><th>Q</th><th>Ref</th><th>BP</th></tr>'+
+    recent.map(r=>{const d=new Date(r.ts);const ds=isNaN(d)?'—':d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      return `<tr><td>${ds}</td><td>${r.name||r.pid||'—'}</td><td>${r.bpm||'—'}</td><td>${r.sdnn||'—'}</td><td>${r.stress||'—'}</td><td>${r.quality!=null&&r.quality!==''?r.quality+'%':'—'}</td><td>${r.refHR||'—'}</td><td>${r.bpSys?r.bpSys+'/'+r.bpDia:'—'}</td></tr>`;}).join('');
+}
+
+function demoData(){
+  const names=['Javier','Maria','Alex','Sam','Lia'], out=[], now=Date.now();
+  let seed=42; const rnd=()=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;};
+  for(let i=0;i<120;i++){const nm=names[Math.floor(rnd()*names.length)];
+    const bpm=Math.round(58+rnd()*38), q=Math.round(40+rnd()*60), hasRef=rnd()<0.4;
+    out.push({ts:new Date(now-i*3600e3*7).toISOString(),sid:'d'+i,pid:nm,name:nm,age:30+Math.floor(rnd()*30),sex:rnd()<0.5?'m':'f',
+      bpm,sdnn:Math.round(20+rnd()*60),rmssd:Math.round(15+rnd()*55),rr:Math.round(11+rnd()*9),pnn50:Math.round(rnd()*40),
+      stress:Math.round(15+rnd()*70),wellness:Math.round(45+rnd()*50),quality:q,
+      bpSys:rnd()<0.3?Math.round(112+rnd()*30):'',bpDia:rnd()<0.3?Math.round(72+rnd()*18):'',
+      refHR:hasRef?bpm+Math.round((rnd()-0.5)*14):''});}
+  return out;
+}
+
+$('loginBtn').onclick=async()=>{
+  const url=$('inUrl').value.trim(), key=$('inKey').value.trim();
+  $('loginErr').textContent='';
+  if(!url||!key){$('loginErr').textContent='Enter both the endpoint URL and admin key.';return;}
+  $('loginBtn').textContent='Signing in…';$('loginBtn').disabled=true;
+  try{const rows=await load(url,key);localStorage.setItem(LS_URL,url);localStorage.setItem(LS_KEY,key);render(rows,'Live · '+rows.length+' rows');}
+  catch(e){$('loginErr').textContent=e.message;}
+  finally{$('loginBtn').textContent='Sign in';$('loginBtn').disabled=false;}
+};
+$('demoBtn').onclick=()=>render(demoData(),'DEMO DATA (not live)');
+$('refreshBtn').onclick=async()=>{const url=localStorage.getItem(LS_URL),key=localStorage.getItem(LS_KEY);
+  if(!url){location.reload();return;} try{const rows=await load(url,key);render(rows,'Live · '+rows.length+' rows · '+new Date().toLocaleTimeString());}catch(e){alert(e.message);}};
+$('logoutBtn').onclick=()=>{localStorage.removeItem(LS_URL);localStorage.removeItem(LS_KEY);location.reload();};
+
+// auto sign-in if saved
+(function(){const url=localStorage.getItem(LS_URL),key=localStorage.getItem(LS_KEY);
+  if(url&&key){$('inUrl').value=url;load(url,key).then(rows=>render(rows,'Live · '+rows.length+' rows')).catch(()=>{});}})();
+</script>
+</body>
+</html>
