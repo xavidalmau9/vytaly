@@ -1082,6 +1082,7 @@ function finish(){
     $('refInput').value='';$('refInput').classList.remove('hidden');$('refSave').classList.remove('hidden');
     $('refbox').classList.remove('hidden');
     refreshPersonUI(); hideRedo();
+    startBtn.textContent='Scan Again';
     hint.textContent='Done — camera off · results below';
     $('stage').classList.add('hidden');wave.classList.add('hidden');resetBtn.classList.add('hidden');
   } else {
