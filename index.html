@@ -246,7 +246,7 @@
 
   <div id="redoBanner" class="redo-banner hidden"></div>
 
-  <canvas class="wave" id="wave" width="480" height="64"></canvas>
+  <canvas class="wave hidden" id="wave" width="480" height="64"></canvas>
 
   <details class="profile" id="profile">
     <summary><span>👤 Profile for <b id="profForName">Guest</b> <span style="opacity:.7">· improves metrics</span></span><span>▾</span></summary>
@@ -1253,6 +1253,7 @@ async function start(){
   if(needsConsent()){showConsent();return;}
   startBtn.textContent='Starting…';startBtn.disabled=true;
   $('stage').classList.remove('hidden');wave.classList.remove('hidden');resetBtn.classList.remove('hidden');
+  wave.width=wave.offsetWidth||480;   // size the canvas now that it's visible
   if(!stream){const ok=await initCamera();if(!ok){startBtn.textContent='Start Scan';startBtn.disabled=false;return;}}
   samples=[];prevMean=null;scanning=true;phase='align';alignGood=0;alignStart=performance.now();
   startBtn.textContent='Aligning…';ring.classList.add('hidden');liveq.classList.remove('on');
@@ -1289,7 +1290,7 @@ function finish(){
     hint.textContent='Done — camera off · results below';
     $('stage').classList.add('hidden');wave.classList.add('hidden');resetBtn.classList.add('hidden');
   } else {
-    startBtn.textContent='Redo Scan';
+    startBtn.textContent='Redo Scan';wave.classList.add('hidden');
     showRedo((e&&e.bpm)?'Too much movement or uneven light, so the numbers wouldn’t be reliable.':'No clear pulse was detected.');
     hint.textContent='Low-quality scan — please redo';
   }
@@ -1297,7 +1298,7 @@ function finish(){
 function reset(){
   scanning=false;phase='idle';cancelAnimationFrame(raf);clearInterval(beatTimer);samples=[];liveq.classList.remove('on');
   stopCamera();
-  $('stage').classList.remove('hidden');wave.classList.remove('hidden');resetBtn.classList.remove('hidden');
+  $('stage').classList.remove('hidden');wave.classList.add('hidden');resetBtn.classList.remove('hidden');
   startBtn.textContent='Start Scan';startBtn.disabled=false;ring.classList.add('hidden');oval.className='oval';
   hint.textContent='Tap Start, then fill the oval with your face';
   wctx.clearRect(0,0,wave.width,wave.height);
@@ -1322,7 +1323,7 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 /* ===================== BOOT + PWA ===================== */
-window.addEventListener('load',()=>{wave.width=wave.offsetWidth; initFaceDetector();});
+window.addEventListener('load',()=>{if(wave.offsetWidth)wave.width=wave.offsetWidth; initFaceDetector();});
 $('refbox').classList.add('hidden');
 refreshPersonUI();
 {const cr=$('contribRow');if(cr)cr.onclick=()=>{setContribute(!contributing());syncContributeToggle();};}

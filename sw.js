@@ -1,5 +1,5 @@
 // Vytaly service worker — offline app shell
-const CACHE = 'vytaly-v24';
+const CACHE = 'vytaly-v25';
 const ASSETS = [
   './',
   './index.html',
