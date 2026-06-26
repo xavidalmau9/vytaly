@@ -198,6 +198,7 @@
   .redo-banner{margin-top:14px;background:rgba(248,113,113,.10);border:1px solid rgba(248,113,113,.5);
     border-radius:14px;padding:14px 16px;font-size:12.5px;line-height:1.55;color:#fecaca}
   .redo-banner b{color:#fff}
+  .reflink{margin-top:10px;font-size:11px;color:var(--accent2);cursor:pointer;text-decoration:underline;display:inline-block}
   .optin{display:flex;gap:9px;align-items:flex-start;margin:4px 0 16px;font-size:12px;color:var(--muted);line-height:1.45;cursor:pointer}
   .optin input{margin-top:2px;width:16px;height:16px;flex:0 0 auto}
   .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--txt);padding:4px 0}
@@ -298,6 +299,7 @@
       <div class="gauge" id="g_hero_bpm" style="margin-top:14px"><i class="gm" id="gm_hero_bpm"></i></div>
       <div class="m-ends"><span id="ge0_hero_bpm"></span><span id="ge1_hero_bpm"></span></div>
       <div class="legend" id="lg_hero_bpm"></div>
+      <div class="reflink hidden" id="refLink">📏 Log a reference HR (optional)</div>
     </div>
   </div>
   <div class="grid" id="measuredGrid" style="margin-top:11px"></div>
@@ -1225,17 +1227,23 @@ function renderHistory(){
       <span class="s">stress ${s.stress??'—'} · HRV ${s.sdnn??'—'}ms${ref}</span></div>`;
   }).join('');
 }
-// reference HR logging (static refbox — no innerHTML gymnastics)
-$('refSave').onclick=()=>{
-  const v=+$('refInput').value; if(!v||!lastRecord){return;}
+// reference HR logging — optional, via the small hero link (no persistent box)
+function logRefHR(v){
+  if(!v||!lastRecord) return false;
   lastRecord.refHR=v;
   const p=activePerson(); if(!p.guest){const h=DB.hist();const arr=h[p.id]||[];
     if(arr.length){arr[arr.length-1].refHR=v;DB.saveHist(h);}}
   uploadScan(lastRecord);   // re-send with the reference HR filled in (dashboard dedupes by sid)
-  const dlt=Math.abs(v-(lastRecord.bpm||0));
-  $('refMsg').innerHTML=`Logged. Vytaly read <b style="color:var(--accent)">${lastRecord.bpm}</b>, ref <b>${v}</b> — off by <b style="color:${dlt<=5?'var(--green)':dlt<=10?'var(--amber)':'var(--red)'}">${dlt} bpm</b>. Thanks!`;
-  $('refInput').classList.add('hidden');$('refSave').classList.add('hidden');
-  renderHistory();
+  renderHistory(); return true;
+}
+$('refLink').onclick=()=>{
+  if(!lastRecord){return;}
+  const v=+prompt('Reference heart rate from a watch or oximeter (bpm):','');
+  if(v>30&&v<220 && logRefHR(v)){
+    const dlt=Math.abs(v-(lastRecord.bpm||0));
+    $('refLink').textContent='✓ Logged: Vytaly '+lastRecord.bpm+' vs ref '+v+' (Δ'+dlt+' bpm)';
+    $('refLink').style.color=dlt<=5?'var(--green)':dlt<=10?'var(--amber)':'var(--red)';
+  }
 };
 
 /* ===================== SCAN FLOW ===================== */
@@ -1249,7 +1257,7 @@ async function start(){
   samples=[];prevMean=null;scanning=true;phase='align';alignGood=0;alignStart=performance.now();
   startBtn.textContent='Aligning…';ring.classList.add('hidden');liveq.classList.remove('on');
   $('hr').textContent='—';MEASURED_TILES.forEach(t=>$('m_'+t.k).textContent='—');DERIVED_TILES.forEach(t=>$('d_'+t.k).textContent='—');
-  $('refbox').classList.add('hidden'); hideRedo();
+  $('refbox').classList.add('hidden'); $('refLink').classList.add('hidden'); hideRedo();
   renderWellness(null); if($('summaryText'))$('summaryText').textContent='Scanning…'; lastScanFeat=null; lastSpo2=null; renderBP(); renderSpo2();
   beatTimer=setInterval(()=>{const hr=parseInt($('hr').textContent);if(hr){pulsedot.style.animation='ping .6s ease-out';setTimeout(()=>pulsedot.style.animation='',600);}},700);
   raf=requestAnimationFrame(loop);
@@ -1275,9 +1283,7 @@ function finish(){
     if($('summaryText')) $('summaryText').innerHTML += _shared
       ? '<br><span style="color:var(--accent)">✓ Shared to your Vytaly dataset.</span>'
       : '<br><span style="color:var(--muted)">Sharing is off — turn on “Contribute scans” in your Profile to add scans to the dataset.</span>';
-    $('refMsg').textContent='📏 Check accuracy — enter a reference HR from a watch/oximeter:';
-    $('refInput').value='';$('refInput').classList.remove('hidden');$('refSave').classList.remove('hidden');
-    $('refbox').classList.remove('hidden');
+    $('refLink').classList.remove('hidden'); $('refLink').textContent='📏 Log a reference HR (optional)';
     refreshPersonUI(); hideRedo();
     startBtn.textContent='Scan Again';
     hint.textContent='Done — camera off · results below';
