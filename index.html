@@ -420,7 +420,7 @@
 <div class="ov hidden" id="eyeOv">
   <div class="sheet" style="max-width:460px">
     <h2>Hemoglobin check (eye)</h2>
-    <p class="s">Pull your lower eyelid down to show the pink inside. Fill the green box with it, in bright even light, and tap <b>Capture</b>. Experimental screening — not a lab test.</p>
+    <p class="s">Pick <b>one eye</b> (either one) and pull its <b>lower eyelid</b> down to show the pink inside. Fill the green box with it, in bright even light, and tap <b>Capture</b>. Experimental screening — not a lab test.</p>
     <div class="eye-stage"><video id="eyeVideo" playsinline muted></video><div class="eye-box"></div><div class="eye-hint" id="eyeHint">Center the pink inner eyelid in the box</div></div>
     <div class="ovbtns"><button class="ghost" id="eyeCancel" style="flex:1">Cancel</button><button class="primary" id="eyeCapture">Capture</button></div>
   </div>
@@ -1031,7 +1031,7 @@ function hbCat(idx){ if(idx>=55)return['Looks normal','green']; if(idx>=38)retur
 function renderHb(){
   const val=$('hbVal'),unit=$('hbUnit'),note=$('hbNote'),st=$('hbStatus'); if(!val)return;
   if(!lastEye){val.textContent='—';unit.textContent='redness index';st.textContent='';st.style.background='transparent';
-    note.innerHTML='Tap below, pull your lower eyelid down to show the pink inside, and capture it — an experimental color screen for low hemoglobin (anemia).';return;}
+    note.innerHTML='Tap below, pull <b>one</b> lower eyelid down to show the pink inside, and capture it — an experimental color screen for low hemoglobin (anemia). One eye is enough.';return;}
   val.textContent=lastEye.idx;unit.textContent='/100 redness';
   const c=hbCat(lastEye.idx);st.textContent=c[0];st.style.color=COL[c[1]];st.style.background=COL[c[1]]+'22';
   note.innerHTML='Experimental color screen · paler conjunctiva can indicate lower hemoglobin · <b>not a lab test — confirm anemia with bloodwork</b>.';
