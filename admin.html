@@ -84,6 +84,10 @@
 <script>
 const $=id=>document.getElementById(id);
 const LS_URL='vy_admin_url', LS_KEY='vy_admin_key';
+// timestamps come from Apps Script in UTC — show them in Eastern (your) time
+function fmtTime(ts){ if(!ts)return '—'; let s=String(ts);
+  if(/^\d{4}-\d{2}-\d{2}T/.test(s) && !/[Zz]|[+\-]\d\d:?\d\d$/.test(s)) s+='Z';   // assume UTC if no tz
+  const d=new Date(s); return isNaN(d)?'—':d.toLocaleString('en-US',{timeZone:'America/New_York',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
 
 function jsonp(url){return new Promise((res,rej)=>{
   const cb='vycb_'+Math.floor(Math.random()*1e9);
@@ -163,8 +167,8 @@ function render(rowsRaw,src){
 
   // recent
   const recent=[...rows].sort((a,b)=>new Date(b.ts)-new Date(a.ts)).slice(0,15);
-  $('recentTbl').innerHTML='<tr><th>When</th><th>Person</th><th>HR</th><th>HRV</th><th>Stress</th><th>Q</th><th>Ref</th><th>BP</th></tr>'+
-    recent.map(r=>{const d=new Date(r.ts);const ds=isNaN(d)?'—':d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  $('recentTbl').innerHTML='<tr><th>When (ET)</th><th>Person</th><th>HR</th><th>HRV</th><th>Stress</th><th>Q</th><th>Ref</th><th>BP</th></tr>'+
+    recent.map(r=>{const ds=fmtTime(r.ts);
       return `<tr><td>${ds}</td><td>${r.name||r.pid||'—'}</td><td>${r.bpm||'—'}</td><td>${r.sdnn||'—'}</td><td>${r.stress||'—'}</td><td>${r.quality!=null&&r.quality!==''?r.quality+'%':'—'}</td><td>${r.refHR||'—'}</td><td>${r.bpSys?r.bpSys+'/'+r.bpDia:'—'}</td></tr>`;}).join('');
 }
 
