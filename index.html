@@ -448,7 +448,9 @@ const APP_VER='vytaly-poc/0.6';
 // ===== Data contribution (opt-in) — paste your deployed Apps Script values to enable =====
 const UPLOAD_URL='https://script.google.com/macros/s/AKfycbzqlsw6Qtr3ZgX55jdJ2jWO8B81pT9jyjoOJxGDffAwlhIF1QU6teKBHf6EvqDSUNA/exec';
 const WRITE_KEY='vytaly-w-94a3bfaeb4bedce3c7e4927f';
-function contributing(){return localStorage.getItem('vs_contribute')==='1';}
+let guestContribute=false;
+function contributing(){const p=activePerson(); if(p.guest)return guestContribute; const u=DB.users().find(x=>x.id===p.id); return !!(u&&u.contribute);}
+function setContribute(on){const p=activePerson(); if(p.guest){guestContribute=!!on;return;} const users=DB.users();const u=users.find(x=>x.id===p.id); if(u){u.contribute=!!on;DB.saveUsers(users);}}
 function syncContributeToggle(){const sw=document.getElementById('contribSw');if(sw)sw.classList.toggle('on',contributing());}
 const video=$('video'), proc=$('proc'), pctx=proc.getContext('2d',{willReadFrequently:true});
 const oval=$('oval'), hint=$('hint');
@@ -519,10 +521,21 @@ function persistProfileEdits(){
 ['pAge','pSex','pHt','pWt'].forEach(k=>$(k).addEventListener('change',persistProfileEdits));
 
 /* ===================== OVERLAYS ===================== */
-$('consentBtn').onclick=()=>{DB.setConsent();
-  if($('optinContribute')&&$('optinContribute').checked)localStorage.setItem('vs_contribute','1');
-  $('consentOv').classList.add('hidden');maybeOnboard();syncContributeToggle();};
-function maybeOnboard(){ if(!DB.onboarded() && DB.users().length===0) openPeople(); }
+function needsConsent(){
+  if(!DB.consented()) return true;                                   // device camera-privacy consent (first ever)
+  const p=activePerson(); if(p.guest) return false;
+  const u=DB.users().find(x=>x.id===p.id); return !!(u && !u.consented); // this person hasn't gone through it yet
+}
+function showConsent(){ if($('optinContribute'))$('optinContribute').checked=contributing(); $('consentOv').classList.remove('hidden'); }
+$('consentBtn').onclick=()=>{
+  DB.setConsent();
+  setContribute(!!($('optinContribute')&&$('optinContribute').checked));
+  const p=activePerson(); if(!p.guest){const users=DB.users();const u=users.find(x=>x.id===p.id);if(u){u.consented=true;DB.saveUsers(users);}}
+  $('consentOv').classList.add('hidden');
+  if(!DB.onboarded() && DB.users().length===0) openPeople();
+  syncContributeToggle();
+};
+function maybeOnboard(){ if(!DB.onboarded() && DB.users().length===0) openPeople(); else if(needsConsent()) showConsent(); }
 function openPeople(){
   $('peopleOv').classList.remove('hidden');
   $('peopleView').classList.remove('hidden'); $('addView').classList.add('hidden');
@@ -535,7 +548,7 @@ function openPeople(){
   list.querySelectorAll('.person').forEach(el=>el.onclick=()=>selectPerson(el.dataset.id));
 }
 function closePeople(){$('peopleOv').classList.add('hidden');}
-function selectPerson(id){lastScanFeat=null;DB.setActive(id);DB.setOnboarded();closePeople();refreshPersonUI();}
+function selectPerson(id){lastScanFeat=null;DB.setActive(id);DB.setOnboarded();closePeople();refreshPersonUI(); if(needsConsent())showConsent();}
 $('whoChip').onclick=openPeople;
 $('guestRow').onclick=()=>selectPerson('guest');
 $('addPersonBtn').onclick=()=>{$('peopleView').classList.add('hidden');$('addView').classList.remove('hidden');};
@@ -1229,7 +1242,7 @@ $('refSave').onclick=()=>{
 let beatTimer=null;
 async function start(){
   if(scanning)return;
-  if(!DB.consented()){$('consentOv').classList.remove('hidden');return;}
+  if(needsConsent()){showConsent();return;}
   startBtn.textContent='Starting…';startBtn.disabled=true;
   $('stage').classList.remove('hidden');wave.classList.remove('hidden');resetBtn.classList.remove('hidden');
   if(!stream){const ok=await initCamera();if(!ok){startBtn.textContent='Start Scan';startBtn.disabled=false;return;}}
@@ -1306,9 +1319,14 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('load',()=>{wave.width=wave.offsetWidth; initFaceDetector();});
 $('refbox').classList.add('hidden');
 refreshPersonUI();
-{const cr=$('contribRow');if(cr)cr.onclick=()=>{localStorage.setItem('vs_contribute',contributing()?'0':'1');syncContributeToggle();};}
+{const cr=$('contribRow');if(cr)cr.onclick=()=>{setContribute(!contributing());syncContributeToggle();};}
+// migrate existing people to per-person consent/contribute (preserve current behavior)
+(function migrateUsers(){const users=DB.users();let ch=false;const legacy=localStorage.getItem('vs_contribute')==='1';
+  users.forEach(u=>{if(u.consented===undefined){u.consented=true;ch=true;} if(u.contribute===undefined){u.contribute=legacy;ch=true;}});
+  if(ch)DB.saveUsers(users);})();
 syncContributeToggle();
-if(!DB.consented()) $('consentOv').classList.remove('hidden'); else maybeOnboard();
+if(!DB.onboarded() && DB.users().length===0){ openPeople(); }   // new device → pick/add a person; consent shows on select
+else if(needsConsent()){ showConsent(); }
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
 </script>
 </body>
