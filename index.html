@@ -298,7 +298,7 @@
   <div class="grid" id="measuredGrid" style="margin-top:11px"></div>
 
   <!-- Blood Pressure (experimental, calibrated) -->
-  <div class="sec-h"><span>Blood pressure</span><span class="pill est">~ EXPERIMENTAL · CALIBRATED</span><span class="line"></span></div>
+  <div class="sec-h"><span>Blood pressure</span><span class="pill est">~ EXPERIMENTAL · PHONE-ONLY</span><span class="line"></span></div>
   <div class="card" id="bpCard">
     <div class="m-top"><span class="lbl">Blood Pressure</span><span class="status" id="bpStatus"></span></div>
     <div><span class="val" id="bpVal">—</span><span class="unit" id="bpUnit">mmHg</span></div>
@@ -310,7 +310,7 @@
         <div class="field"><label>Cuff Diastolic</label><input id="bpDia" type="number" inputmode="numeric" placeholder="80"></div>
       </div>
       <div class="ovbtns"><button class="ghost" id="bpCancel" style="flex:1">Cancel</button><button class="primary" id="bpSaveCal">Save calibration</button></div>
-      <div class="bp-note" style="margin-top:8px">Enter a reading from a real arm cuff taken right after this scan — we anchor your trend to it. Re-calibrate monthly for accuracy.</div>
+      <div class="bp-note" style="margin-top:8px">Optional — a cuff reading taken right after a scan fine-tunes your estimate <b>and</b> donates one labeled example that trains the phone-only model. Not required.</div>
     </div>
   </div>
 
@@ -690,15 +690,30 @@ function estimate(raw){
       rmssd=Math.round(Math.sqrt(sq/(f.length-1))); pnn50=Math.round(nn/(f.length-1)*100);
     }
   }
-  // pulse-wave morphology: mean rise fraction (foot→peak vs full beat) — a real stiffness/BP-related feature
-  let riseFrac=null;
-  if(pk.length>3){const rs=[];
-    for(let i=1;i<pk.length-1;i++){const a=pk[i-1],p=pk[i],b=pk[i+1];
-      let t0=a,mn0=pulse[a];for(let j=a;j<=p;j++)if(pulse[j]<mn0){mn0=pulse[j];t0=j;}
-      let t1=p,mn1=pulse[p];for(let j=p;j<=b;j++)if(pulse[j]<mn1){mn1=pulse[j];t1=j;}
-      const rise=p-t0,fall=t1-p,tot=rise+fall;
-      if(tot>2&&rise>0&&fall>0)rs.push(rise/tot);}
-    if(rs.length)riseFrac=+(rs.reduce((x,y)=>x+y,0)/rs.length).toFixed(3);}
+  // pulse-wave morphology from an ENSEMBLE-AVERAGED beat (denoised) — BP-related shape features
+  let riseFrac=null, feat=null;
+  if(pk.length>3){
+    const lens=[];for(let i=1;i<pk.length;i++)lens.push(pk[i]-pk[i-1]);
+    const good=lens.filter(v=>v>FS_TARGET*0.33&&v<FS_TARGET*1.5);
+    if(good.length>=3){
+      const L=Math.round(median(good)), off=Math.round(L*0.3), avg=new Array(L).fill(0); let nb=0;
+      for(let i=0;i<pk.length;i++){const stt=pk[i]-off; if(stt<0||stt+L>=pulse.length)continue;
+        let mn=Infinity,mx=-Infinity; for(let j=0;j<L;j++){const v=pulse[stt+j];if(v<mn)mn=v;if(v>mx)mx=v;}
+        const rg=(mx-mn)||1; for(let j=0;j<L;j++)avg[j]+=(pulse[stt+j]-mn)/rg; nb++;}
+      if(nb>=3){
+        for(let j=0;j<L;j++)avg[j]/=nb;
+        let sp=0,spv=-Infinity; for(let j=0;j<L;j++)if(avg[j]>spv){spv=avg[j];sp=j;}
+        let ft=0,ftv=Infinity; for(let j=0;j<=sp;j++)if(avg[j]<ftv){ftv=avg[j];ft=j;}
+        riseFrac=+clp((sp-ft)/L,0.05,0.95).toFixed(3);
+        const half=ftv+(spv-ftv)*0.5; let l=ft,r=sp;
+        while(l<sp&&avg[l]<half)l++; while(r<L-1&&avg[r]>half)r++;
+        const widthFrac=+clp((r-l)/L,0.05,0.95).toFixed(3);
+        const li=Math.min(L-1,Math.round(L*0.66));
+        const aix=+clp((avg[li]-ftv)/((spv-ftv)||1),0,1).toFixed(3);  // reflection-wave proxy (AIx-like)
+        feat={riseFrac,widthFrac,aix,nBeats:nb};
+      }
+    }
+  }
   // confidence = signal strength (SNR) blended with heart-rate stability across the scan (split-half)
   const half=Math.floor(pulse.length/2);
   const hr1=dominantFreq(pulse.slice(0,half),FS_TARGET,0.7,3.0,0.02).freq*60;
@@ -706,7 +721,7 @@ function estimate(raw){
   const cons=clp(1-Math.abs(hr1-hr2)/14,0,1);            // HR consistent across halves → stable signal
   const snrQ=clp((hrBand.snr-1)/6,0,1);
   const quality=clp(snrQ*(0.25+0.75*cons),0,1);          // an unstable (drifting) HR tanks confidence even if SNR is high
-  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,riseFrac,pulse,quality,hrDrift:Math.round(Math.abs(hr1-hr2)),
+  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,riseFrac,feat,pulse,quality,hrDrift:Math.round(Math.abs(hr1-hr2)),
     fps:Math.round(G.length/((times[times.length-1]-times[0])/1000)),frames:raw.length};
 }
 
@@ -890,47 +905,62 @@ function renderSummary(e,b){
   el.innerHTML=html;
 }
 
-/* ===================== BLOOD PRESSURE (experimental, calibrated) ===================== */
-let guestBP=null, lastScanFeat=null;
-function getBPCal(){const p=activePerson();if(p.guest)return guestBP;const u=DB.users().find(x=>x.id===p.id);return (u&&u.bp)||null;}
-function setBPCal(cal){const p=activePerson();if(p.guest){guestBP=cal;return;}const users=DB.users();const u=users.find(x=>x.id===p.id);if(u){u.bp=cal;DB.saveUsers(users);}}
-function estimateBP(feat,cal){
-  if(!cal||!feat||feat.hr==null)return null;
-  const dHR=feat.hr-cal.hr0, dRF=(feat.rf!=null&&cal.rf0!=null)?(feat.rf-cal.rf0):0;
-  let sbp=Math.round(cal.sbp0+0.5*dHR+60*dRF), dbp=Math.round(cal.dbp0+0.30*dHR+30*dRF);
-  sbp=clamp(sbp,85,205);dbp=clamp(dbp,50,125);if(sbp<dbp+20)sbp=dbp+20;
+/* ===================== BLOOD PRESSURE (phone-only, experimental) ===================== */
+let guestBP=null, lastScanFeat=null;   // lastScanFeat = {hr, feat:{riseFrac,widthFrac,aix}}
+function getBPOff(){const p=activePerson();if(p.guest)return guestBP;const u=DB.users().find(x=>x.id===p.id);return (u&&u.bpOff)||null;}
+function setBPOff(o){const p=activePerson();if(p.guest){guestBP=o;return;}const users=DB.users();const u=users.find(x=>x.id===p.id);if(u){u.bpOff=o;DB.saveUsers(users);}}
+// PHONE-ONLY baseline: demographics + pulse-wave morphology (literature-informed; experimental, NOT clinical)
+function bpFromFeat(sf,prof){
+  if(!sf||!prof||!prof.age||sf.hr==null) return null;
+  const age=prof.age, bmi=(prof.ht&&prof.wt)?prof.wt/((prof.ht/100)**2):24, male=prof.sex==='m';
+  let sbp=108+0.45*(age-30)+(male?4:0)+0.55*(bmi-22)+0.12*(sf.hr-65);
+  let dbp=70 +0.12*(age-30)+(male?2:0)+0.35*(bmi-22)+0.08*(sf.hr-65);
+  const f=sf.feat||{};
+  if(f.riseFrac!=null){sbp+=(0.34-f.riseFrac)*42; dbp+=(0.34-f.riseFrac)*18;}  // faster rise (stiffer) → higher
+  if(f.aix!=null) sbp+=(f.aix-0.30)*26;                                          // stronger reflection → higher
+  sbp=clamp(Math.round(sbp),90,200); dbp=clamp(Math.round(dbp),55,125); if(sbp<dbp+25)sbp=dbp+25;
   return {sbp,dbp};
 }
+function currentBP(){
+  const base=bpFromFeat(lastScanFeat,getProfile()); if(!base) return null;
+  const off=getBPOff();
+  if(off) return {sbp:clamp(base.sbp+off.dS,90,200),dbp:clamp(base.dbp+off.dD,55,125),personalized:true};
+  return {sbp:base.sbp,dbp:base.dbp,personalized:false};
+}
 function bpCat(sbp,dbp){if(sbp>=140||dbp>=90)return['High','red'];if(sbp>=130||dbp>=80)return['Stage 1','amber'];if(sbp>=120)return['Elevated','amber'];return['Normal','green'];}
-function calDate(cal){try{return new Date(cal.ts).toLocaleDateString(undefined,{month:'short',day:'numeric'});}catch(e){return'';}}
-function openBPForm(){const cal=getBPCal();if(cal){$('bpSys').value=cal.sbp0;$('bpDia').value=cal.dbp0;}$('bpCalForm').classList.remove('hidden');$('bpActions').classList.add('hidden');}
+function openBPForm(){$('bpCalForm').classList.remove('hidden');$('bpActions').classList.add('hidden');}
 function closeBPForm(){$('bpCalForm').classList.add('hidden');$('bpActions').classList.remove('hidden');}
 function saveBPCal(){
   const sys=+$('bpSys').value,dia=+$('bpDia').value;
-  if(!sys||!dia||sys<70||sys>250||dia<40||dia>160){alert('Enter a valid cuff reading (e.g. 120 / 80).');return;}
-  if(sys<=dia){alert('Systolic (top number) should be higher than diastolic.');return;}
-  if(!lastScanFeat){alert('Run a scan first, then enter the cuff reading you took right after it.');return;}
-  setBPCal({sbp0:sys,dbp0:dia,hr0:lastScanFeat.hr,rf0:lastScanFeat.rf,ts:Date.now()});
+  if(!sys||!dia||sys<70||sys>250||dia<40||dia>160||sys<=dia){alert('Enter a valid cuff reading (e.g. 120 / 80).');return;}
+  if(!lastScanFeat){alert('Run a scan first, then add the cuff reading you took right after it.');return;}
+  const base=bpFromFeat(lastScanFeat,getProfile());
+  if(base) setBPOff({dS:sys-base.sbp,dD:dia-base.dbp,ts:Date.now()});
+  uploadCuff(sys,dia);   // donates a labeled training example
   closeBPForm();renderBP();
 }
 function renderBP(){
-  const cal=getBPCal(),feat=lastScanFeat;
-  const val=$('bpVal'),unit=$('bpUnit'),note=$('bpNote'),st=$('bpStatus'),btn=$('bpCalBtn');
-  if(!val)return;
-  if(!cal){
-    val.textContent='—';unit.textContent='mmHg';
-    st.textContent='Not calibrated';st.style.color='var(--muted)';st.style.background='transparent';
-    note.textContent=feat?'Calibrate once with a real cuff reading to enable trend estimates.':'Run a scan, then calibrate with a real cuff reading.';
-    btn.textContent='Calibrate with a cuff reading';return;
-  }
-  btn.textContent='Re-calibrate';
-  if(!feat){val.textContent=cal.sbp0+' / '+cal.dbp0;unit.textContent='mmHg';
-    st.textContent='Baseline';st.style.color='var(--muted)';st.style.background='transparent';
-    note.innerHTML='Calibrated '+calDate(cal)+' · run a scan to estimate your current trend.';return;}
-  const bp=estimateBP(feat,cal);
-  val.textContent=bp.sbp+' / '+bp.dbp;unit.textContent='mmHg';
+  const val=$('bpVal'),unit=$('bpUnit'),note=$('bpNote'),st=$('bpStatus'),btn=$('bpCalBtn'); if(!val)return;
+  const prof=getProfile(); unit.textContent='mmHg';
+  const blank=()=>{val.textContent='—';st.textContent='';st.style.background='transparent';};
+  if(!prof.age){blank();note.innerHTML='Add your <b>age</b> (plus height & weight) in Profile above — then your scan gives a phone-only estimate, no cuff needed.';btn.textContent='Add a cuff reading (optional)';return;}
+  if(!lastScanFeat){blank();note.textContent='Run a scan to estimate your blood pressure — no cuff needed.';btn.textContent='Add a cuff reading (optional)';return;}
+  const bp=currentBP(); if(!bp){blank();note.textContent='Run a scan to estimate your blood pressure.';return;}
+  val.textContent=bp.sbp+' / '+bp.dbp;
   const c=bpCat(bp.sbp,bp.dbp);st.textContent=c[0];st.style.color=COL[c[1]];st.style.background=COL[c[1]]+'22';
-  note.innerHTML='Experimental · calibrated '+calDate(cal)+' · tracks trend, <b>not for medical decisions</b>.';
+  note.innerHTML='Experimental · <b>phone-only</b>'+(bp.personalized?' · personalized to your cuff':'')+' · early model, improves as the dataset grows · <b>not for medical decisions</b>.';
+  btn.textContent=getBPOff()?'Update cuff reading':'Add a cuff reading (optional)';
+}
+// a cuff reading + the scan's features = one labeled training example for the future model
+function uploadCuff(sys,dia){
+  if(!UPLOAD_URL||!WRITE_KEY||!contributing()||!lastScanFeat)return;
+  const p=activePerson(),prof=getProfile(),base=bpFromFeat(lastScanFeat,prof);
+  const scan={sid:'cuff'+Date.now(),pid:p.id,name:p.guest?'Guest':(p.name||''),email:p.guest?'':(p.email||''),
+    age:prof.age,sex:prof.sex,bpm:lastScanFeat.hr,bpSys:base?base.sbp:'',bpDia:base?base.dbp:'',
+    refHR:'',stress:'',wellness:'',quality:'',sdnn:'',rmssd:'',rr:'',pnn50:'',
+    ua:'CUFF cuffS='+sys+' cuffD='+dia+' rf='+((lastScanFeat.feat||{}).riseFrac)+' aix='+((lastScanFeat.feat||{}).aix),
+    appVersion:APP_VER};
+  try{fetch(UPLOAD_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:WRITE_KEY,scan})});}catch(e){}
 }
 $('bpCalBtn').onclick=openBPForm;$('bpCancel').onclick=closeBPForm;$('bpSaveCal').onclick=saveBPCal;
 
@@ -1070,9 +1100,9 @@ function finish(){
   if(ok){
     const prof=getProfile(),b=deriveBiomarkers(e,prof);
     setHero(e);drawWave(e.pulse);setMetrics(e,b);
-    lastScanFeat={hr:e.bpm,rf:e.riseFrac};
+    lastScanFeat={hr:e.bpm,feat:e.feat};
     lastRecord=buildRecord(e,b,prof);
-    const _cal=getBPCal();if(_cal)lastRecord.bp=estimateBP(lastScanFeat,_cal);
+    const _bp=currentBP(); if(_bp)lastRecord.bp={sbp:_bp.sbp,dbp:_bp.dbp};
     saveScan(lastRecord); uploadScan(lastRecord); renderBP();
     const _shared=!!(contributing()&&UPLOAD_URL&&WRITE_KEY);
     if($('summaryText')) $('summaryText').innerHTML += _shared
