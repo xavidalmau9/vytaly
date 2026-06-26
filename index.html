@@ -247,8 +247,8 @@
     <div class="pbody">
       <div class="field"><label>Age</label><input id="pAge" type="number" inputmode="numeric" placeholder="35"></div>
       <div class="field"><label>Sex</label><select id="pSex"><option value="">—</option><option value="m">Male</option><option value="f">Female</option></select></div>
-      <div class="field"><label>Height (cm)</label><input id="pHt" type="number" inputmode="numeric" placeholder="175"></div>
-      <div class="field"><label>Weight (kg)</label><input id="pWt" type="number" inputmode="numeric" placeholder="75"></div>
+      <div class="field"><label>Height (in)</label><input id="pHt" type="number" inputmode="numeric" placeholder="70"></div>
+      <div class="field"><label>Weight (lb)</label><input id="pWt" type="number" inputmode="numeric" placeholder="165"></div>
       <div class="field full"><div class="toggle-row" id="contribRow"><span>Contribute anonymized scans to improve Vytaly</span><span class="sw" id="contribSw"><i></i></span></div></div>
     </div>
   </details>
@@ -383,8 +383,8 @@
         <div class="field full"><label>Email</label><input id="aEmail" type="email" placeholder="alex@email.com"></div>
         <div class="field"><label>Age</label><input id="aAge" type="number" inputmode="numeric" placeholder="35"></div>
         <div class="field"><label>Sex</label><select id="aSex"><option value="">—</option><option value="m">Male</option><option value="f">Female</option></select></div>
-        <div class="field"><label>Height (cm)</label><input id="aHt" type="number" inputmode="numeric" placeholder="175"></div>
-        <div class="field"><label>Weight (kg)</label><input id="aWt" type="number" inputmode="numeric" placeholder="75"></div>
+        <div class="field"><label>Height (in)</label><input id="aHt" type="number" inputmode="numeric" placeholder="70"></div>
+        <div class="field"><label>Weight (lb)</label><input id="aWt" type="number" inputmode="numeric" placeholder="165"></div>
       </div>
       <div class="ovbtns">
         <button class="ghost" id="cancelAdd" style="flex:1">Cancel</button>
@@ -633,6 +633,7 @@ const mean=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
 const std=a=>{const m=mean(a);return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/(a.length||1));};
 const median=a=>{const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
 const clp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const bmiCalc=(htIn,wtLb)=>(htIn&&wtLb)?703*wtLb/(htIn*htIn):null;   // imperial BMI
 const detrend=x=>{const m=mean(x);return x.map(v=>v-m);};
 function movingAvg(x,w){const out=[];for(let i=0;i<x.length;i++){let s=0,c=0;for(let k=-w;k<=w;k++){const j=i+k;if(j>=0&&j<x.length){s+=x[j];c++;}}out.push(s/c);}return out;}
 function bandpass(x,fs,lo,hi){const wHi=Math.round(fs/lo),wLo=Math.max(1,Math.round(fs/hi/2));const base=movingAvg(x,wHi);const hp=x.map((v,i)=>v-base[i]);return movingAvg(hp,wLo);}
@@ -739,7 +740,7 @@ function deriveBiomarkers(e,prof){
   o.fatigue=hrv!=null?clamp(Math.round((bpm-55)*1.0+(45-hrv)*0.7),5,95):null;
   if(age&&bpm){const hrMax=208-0.7*age;o.vo2=clamp(Math.round(15.3*hrMax/bpm),18,72);}else o.vo2=null;
   if(age){let ba=age+(bpm-65)*0.12-((hrv||40)-40)*0.10;o.bioAge=clamp(Math.round(ba),16,95);}else o.bioAge=null;
-  o.bmi=(ht&&wt)?+(wt/((ht/100)**2)).toFixed(1):null;
+  o.bmi=(ht&&wt)?+bmiCalc(ht,wt).toFixed(1):null;
   o.wellness=wellnessScore(e,o);
   return o;
 }
@@ -912,7 +913,7 @@ function setBPOff(o){const p=activePerson();if(p.guest){guestBP=o;return;}const 
 // PHONE-ONLY baseline: demographics + pulse-wave morphology (literature-informed; experimental, NOT clinical)
 function bpFromFeat(sf,prof){
   if(!sf||!prof||!prof.age||sf.hr==null) return null;
-  const age=prof.age, bmi=(prof.ht&&prof.wt)?prof.wt/((prof.ht/100)**2):24, male=prof.sex==='m';
+  const age=prof.age, bmi=(prof.ht&&prof.wt)?bmiCalc(prof.ht,prof.wt):24, male=prof.sex==='m';
   let sbp=108+0.45*(age-30)+(male?4:0)+0.55*(bmi-22)+0.12*(sf.hr-65);
   let dbp=70 +0.12*(age-30)+(male?2:0)+0.35*(bmi-22)+0.08*(sf.hr-65);
   const f=sf.feat||{};
