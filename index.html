@@ -319,6 +319,20 @@
     </div>
   </div>
 
+  <!-- Blood oxygen (experimental, from the same scan) -->
+  <div class="sec-h"><span>Blood oxygen</span><span class="pill est">~ EXPERIMENTAL · PHONE-ONLY</span><span class="line"></span></div>
+  <div class="card" id="spo2Card">
+    <div class="m-top"><span class="lbl">Oxygen Saturation (SpO₂)</span><span class="status" id="spo2Status"></span></div>
+    <div><span class="val" id="spo2Val">—</span><span class="unit">% SpO₂</span></div>
+    <div class="bp-note" id="spo2Note">Estimated from your face scan. Phone cameras lack the infrared light real oximeters use — treat this as a rough indicator only.</div>
+    <div id="spo2Actions" style="margin-top:11px"><button class="primary" id="spo2CalBtn" style="padding:11px;font-size:13px">Calibrate with an oximeter (optional)</button></div>
+    <div id="spo2CalForm" class="hidden" style="margin-top:11px">
+      <div class="field"><label>Fingertip oximeter SpO₂ (%)</label><input id="spo2Ref" type="number" inputmode="numeric" placeholder="98"></div>
+      <div class="ovbtns"><button class="ghost" id="spo2Cancel" style="flex:1">Cancel</button><button class="primary" id="spo2Save">Save</button></div>
+      <div class="bp-note" style="margin-top:8px">Optional — an oximeter reading right after a scan fine-tunes your estimate and donates a training example.</div>
+    </div>
+  </div>
+
   <div class="refbox" id="refbox">
     <span id="refMsg">📏 Check accuracy — enter a reference HR from a watch/oximeter:</span>
     <input id="refInput" type="number" inputmode="numeric" placeholder="bpm">
@@ -754,7 +768,18 @@ function estimate(raw){
   const cons=clp(1-Math.abs(hr1-hr2)/14,0,1);            // HR consistent across halves → stable signal
   const snrQ=clp((hrBand.snr-1)/6,0,1);
   const quality=clp(snrQ*(0.25+0.75*cons),0,1);          // an unstable (drifting) HR tanks confidence even if SNR is high
-  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,riseFrac,feat,pulse,quality,hrDrift:Math.round(Math.abs(hr1-hr2)),
+  // SpO2 (experimental, phone-only): red/blue ratio-of-ratios of the pulsatile signal — weak without IR
+  let spo2=null;
+  {
+    const Rb=bandpass(detrend(R),FS_TARGET,0.7,4.0), Bb=bandpass(detrend(B),FS_TARGET,0.7,4.0);
+    const dcR=mean(R), dcB=mean(B), acR=std(Rb), acB=std(Bb);
+    const blueSNR=dominantFreq(Bb,FS_TARGET,0.7,3.0,0.02).snr;
+    if(dcR>2&&dcB>2&&acB>0.02&&blueSNR>1.4){
+      const ror=(acR/dcR)/(acB/dcB);
+      spo2=clamp(Math.round(98-(ror-1)*6),90,100);
+    }
+  }
+  return {bpm,rr,sdnn,rmssd,pnn50,meanIBI,riseFrac,feat,spo2,pulse,quality,hrDrift:Math.round(Math.abs(hr1-hr2)),
     fps:Math.round(G.length/((times[times.length-1]-times[0])/1000)),frames:raw.length};
 }
 
@@ -897,7 +922,6 @@ function buildGrids(){
 buildGrids();
 const LAB_TILES=[
   {lbl:'Avg Blood Glucose / A1C',u:'mg/dL · %'},
-  {lbl:'Oxygen Saturation',u:'% SpO₂'},
 ];
 function buildLab(){$('labGrid').innerHTML=LAB_TILES.map(t=>
   `<div class="card locked"><span class="lockico">🔒</span><div class="lbl">${t.lbl}</div>
@@ -1046,6 +1070,41 @@ function uploadEye(eye,labHb){
     appVersion:APP_VER};
   try{fetch(UPLOAD_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:WRITE_KEY,scan})});}catch(e){}
 }
+/* ===================== BLOOD OXYGEN (SpO2, experimental) ===================== */
+let guestSpo2=0, lastSpo2=null;
+function getSpo2Off(){const p=activePerson();if(p.guest)return guestSpo2;const u=DB.users().find(x=>x.id===p.id);return (u&&u.spo2Off)||0;}
+function setSpo2Off(o){const p=activePerson();if(p.guest){guestSpo2=o;return;}const users=DB.users();const u=users.find(x=>x.id===p.id);if(u){u.spo2Off=o;DB.saveUsers(users);}}
+function currentSpo2(){if(lastSpo2==null)return null;return clamp(Math.round(lastSpo2+getSpo2Off()),85,100);}
+function spo2Cat(v){if(v>=95)return['Normal','green'];if(v>=92)return['Borderline','amber'];return['Low','red'];}
+function renderSpo2(){
+  const val=$('spo2Val'),note=$('spo2Note'),st=$('spo2Status'),btn=$('spo2CalBtn'); if(!val)return;
+  const v=currentSpo2();
+  if(v==null){val.textContent='—';st.textContent='';st.style.background='transparent';
+    note.innerHTML=lastSpo2===null&&lastScanFeat?'Signal was too weak to estimate oxygen this scan — rescan in bright, even light and hold still.':'Estimated from your face scan. Phone cameras lack the infrared light real oximeters use — treat this as a rough indicator only.';
+    btn.textContent='Calibrate with an oximeter (optional)';return;}
+  val.textContent=v;
+  const c=spo2Cat(v);st.textContent=c[0];st.style.color=COL[c[1]];st.style.background=COL[c[1]]+'22';
+  note.innerHTML='Experimental · <b>phone-only</b>'+(getSpo2Off()?' · calibrated to your oximeter':'')+' · weak without infrared, rough indicator · <b>not for medical decisions</b>.';
+  btn.textContent=getSpo2Off()?'Update oximeter reading':'Calibrate with an oximeter (optional)';
+}
+function uploadSpo2(ref){
+  if(!UPLOAD_URL||!WRITE_KEY||!contributing()||lastSpo2==null)return;
+  const p=activePerson(),prof=getProfile();
+  const scan={sid:'spo2'+Date.now(),pid:p.id,name:p.guest?'Guest':(p.name||''),email:p.guest?'':(p.email||''),
+    age:prof.age,sex:prof.sex,bpm:'',bpSys:'',bpDia:'',refHR:'',stress:'',wellness:'',quality:'',
+    sdnn:'',rmssd:'',rr:'',pnn50:'',ua:'SPO2 est='+lastSpo2+(ref?' ref='+ref:''),appVersion:APP_VER};
+  try{fetch(UPLOAD_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:WRITE_KEY,scan})});}catch(e){}
+}
+$('spo2CalBtn').onclick=()=>{$('spo2CalForm').classList.toggle('hidden');$('spo2Actions').classList.toggle('hidden');};
+$('spo2Cancel').onclick=()=>{$('spo2CalForm').classList.add('hidden');$('spo2Actions').classList.remove('hidden');};
+$('spo2Save').onclick=()=>{
+  const v=+$('spo2Ref').value;
+  if(!v||v<70||v>100){alert('Enter a valid oximeter reading (e.g. 98).');return;}
+  if(lastSpo2==null){alert('Run a scan first, then enter the oximeter reading from right after it.');return;}
+  setSpo2Off(v-lastSpo2); uploadSpo2(v);
+  $('spo2CalForm').classList.add('hidden');$('spo2Actions').classList.remove('hidden'); renderSpo2();
+};
+
 $('hbStartBtn').onclick=eyeStart;
 $('eyeCancel').onclick=closeEye;
 $('eyeCapture').onclick=captureEye;
@@ -1178,7 +1237,7 @@ async function start(){
   startBtn.textContent='Aligning…';ring.classList.add('hidden');liveq.classList.remove('on');
   $('hr').textContent='—';MEASURED_TILES.forEach(t=>$('m_'+t.k).textContent='—');DERIVED_TILES.forEach(t=>$('d_'+t.k).textContent='—');
   $('refbox').classList.add('hidden'); hideRedo();
-  renderWellness(null); if($('summaryText'))$('summaryText').textContent='Scanning…'; lastScanFeat=null; renderBP();
+  renderWellness(null); if($('summaryText'))$('summaryText').textContent='Scanning…'; lastScanFeat=null; lastSpo2=null; renderBP(); renderSpo2();
   beatTimer=setInterval(()=>{const hr=parseInt($('hr').textContent);if(hr){pulsedot.style.animation='ping .6s ease-out';setTimeout(()=>pulsedot.style.animation='',600);}},700);
   raf=requestAnimationFrame(loop);
 }
@@ -1195,10 +1254,10 @@ function finish(){
   if(ok){
     const prof=getProfile(),b=deriveBiomarkers(e,prof);
     setHero(e);drawWave(e.pulse);setMetrics(e,b);
-    lastScanFeat={hr:e.bpm,feat:e.feat};
+    lastScanFeat={hr:e.bpm,feat:e.feat}; lastSpo2=e.spo2;
     lastRecord=buildRecord(e,b,prof);
     const _bp=currentBP(); if(_bp)lastRecord.bp={sbp:_bp.sbp,dbp:_bp.dbp};
-    saveScan(lastRecord); uploadScan(lastRecord); renderBP();
+    saveScan(lastRecord); uploadScan(lastRecord); renderBP(); renderSpo2();
     const _shared=!!(contributing()&&UPLOAD_URL&&WRITE_KEY);
     if($('summaryText')) $('summaryText').innerHTML += _shared
       ? '<br><span style="color:var(--accent)">✓ Shared to your Vytaly dataset.</span>'
@@ -1228,7 +1287,7 @@ function reset(){
   MEASURED_TILES.forEach(t=>{$('m_'+t.k).textContent='—';paintMetric('m',t.k,null,null);});
   DERIVED_TILES.forEach(t=>{$('d_'+t.k).textContent='—';paintMetric('d',t.k,null,null);});
   renderWellness(null);
-  lastScanFeat=null;renderBP();
+  lastScanFeat=null;lastSpo2=null;renderBP();renderSpo2();
   if($('summaryText'))$('summaryText').textContent="Run a scan to see how you're doing.";
 }
 startBtn.addEventListener('click',start);
