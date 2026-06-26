@@ -190,6 +190,11 @@
   .bp-note{font-size:11px;color:var(--muted);line-height:1.5;margin-top:8px}
   .bp-note b{color:var(--txt)}
   #bpVal{font-size:34px;font-weight:800}
+  #hbVal{font-size:34px;font-weight:800}
+  .eye-stage{position:relative;width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:#05080f;border:1px solid var(--line);margin:8px 0 6px}
+  .eye-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+  .eye-box{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:56%;height:28%;border:2.5px solid var(--accent);border-radius:10px;box-shadow:0 0 0 4000px rgba(5,8,15,.5);pointer-events:none}
+  .eye-hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:12px;color:#fff;text-shadow:0 1px 4px #000;font-weight:500}
   .redo-banner{margin-top:14px;background:rgba(248,113,113,.10);border:1px solid rgba(248,113,113,.5);
     border-radius:14px;padding:14px 16px;font-size:12.5px;line-height:1.55;color:#fecaca}
   .redo-banner b{color:#fff}
@@ -323,6 +328,23 @@
   <div class="sec-h"><span>Derived insights</span><span class="pill est">~ ESTIMATE</span><span class="line"></span></div>
   <div class="grid" id="derivedGrid"></div>
 
+  <!-- Hemoglobin / anemia screen (eye / conjunctiva) -->
+  <div class="sec-h"><span>Hemoglobin · anemia screen</span><span class="pill est">~ EXPERIMENTAL · EYE</span><span class="line"></span></div>
+  <div class="card" id="hbCard">
+    <div class="m-top"><span class="lbl">Conjunctiva (eye) screen</span><span class="status" id="hbStatus"></span></div>
+    <div><span class="val" id="hbVal">—</span><span class="unit" id="hbUnit">redness index</span></div>
+    <div class="bp-note" id="hbNote">Tap below, pull your lower eyelid down to show the pink inside, and capture it — an experimental color screen for low hemoglobin (anemia).</div>
+    <div id="hbActions" style="margin-top:11px;display:flex;gap:10px">
+      <button class="primary" id="hbStartBtn" style="padding:11px;font-size:13px">👁 Scan your eye</button>
+      <button class="ghost" id="hbLabBtn" style="padding:11px;font-size:13px;flex:0 0 auto">Enter lab Hb</button>
+    </div>
+    <div id="hbLabForm" class="hidden" style="margin-top:11px">
+      <div class="field"><label>Lab hemoglobin (g/dL)</label><input id="hbLab" type="number" inputmode="decimal" placeholder="14.0"></div>
+      <div class="ovbtns"><button class="ghost" id="hbLabCancel" style="flex:1">Cancel</button><button class="primary" id="hbLabSave">Save</button></div>
+      <div class="bp-note" style="margin-top:8px">Optional — your lab value + an eye scan donates a labeled example that trains the model. Use a recent bloodwork number.</div>
+    </div>
+  </div>
+
   <div class="sec-h"><span>Lab biomarkers</span><span class="pill lock">🔒 PHASE 2 · NEEDS AI MODEL</span><span class="line"></span></div>
   <div class="grid" id="labGrid"></div>
   <div class="lock-note" style="margin-top:10px">These can't be measured from a camera with signal processing alone — they need AI models trained on labeled medical data. Coming in Phase 2. We will never show an estimated number dressed up as a real lab result.</div>
@@ -391,6 +413,16 @@
         <button class="primary" id="saveAdd">Save & select</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Eye-capture overlay -->
+<div class="ov hidden" id="eyeOv">
+  <div class="sheet" style="max-width:460px">
+    <h2>Hemoglobin check (eye)</h2>
+    <p class="s">Pull your lower eyelid down to show the pink inside. Fill the green box with it, in bright even light, and tap <b>Capture</b>. Experimental screening — not a lab test.</p>
+    <div class="eye-stage"><video id="eyeVideo" playsinline muted></video><div class="eye-box"></div><div class="eye-hint" id="eyeHint">Center the pink inner eyelid in the box</div></div>
+    <div class="ovbtns"><button class="ghost" id="eyeCancel" style="flex:1">Cancel</button><button class="primary" id="eyeCapture">Capture</button></div>
   </div>
 </div>
 
@@ -865,7 +897,7 @@ function buildGrids(){
 buildGrids();
 const LAB_TILES=[
   {lbl:'Avg Blood Glucose / A1C',u:'mg/dL · %'},
-  {lbl:'Oxygen Saturation',u:'% SpO₂'},{lbl:'Hemoglobin',u:'g/dL'},
+  {lbl:'Oxygen Saturation',u:'% SpO₂'},
 ];
 function buildLab(){$('labGrid').innerHTML=LAB_TILES.map(t=>
   `<div class="card locked"><span class="lockico">🔒</span><div class="lbl">${t.lbl}</div>
@@ -964,6 +996,68 @@ function uploadCuff(sys,dia){
   try{fetch(UPLOAD_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:WRITE_KEY,scan})});}catch(e){}
 }
 $('bpCalBtn').onclick=openBPForm;$('bpCancel').onclick=closeBPForm;$('bpSaveCal').onclick=saveBPCal;
+
+/* ===================== HEMOGLOBIN / ANEMIA SCREEN (eye conjunctiva) ===================== */
+let eyeStream=null, lastEye=null;
+async function eyeStart(){
+  stopCamera();                         // make sure the main pulse camera is off
+  $('eyeHint').textContent='Center the pink inner eyelid in the box';
+  $('eyeOv').classList.remove('hidden');
+  try{eyeStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:960}},audio:false});
+    $('eyeVideo').srcObject=eyeStream; await $('eyeVideo').play();}
+  catch(e){$('eyeHint').textContent='⚠ Camera blocked — allow camera access.';}
+}
+function stopEye(){if(eyeStream){eyeStream.getTracks().forEach(t=>t.stop());eyeStream=null;}try{$('eyeVideo').pause();}catch(e){}$('eyeVideo').srcObject=null;}
+function closeEye(){stopEye();$('eyeOv').classList.add('hidden');}
+function captureEye(){
+  const v=$('eyeVideo'),vw=v.videoWidth,vh=v.videoHeight; if(!vw){$('eyeHint').textContent='Camera not ready — wait a moment';return;}
+  // ROI matches the on-screen .eye-box (56% wide, 28% tall, centered at 52% height)
+  const sw=vw*0.56, sh=vh*0.28, sx=(vw-sw)/2, sy=vh*0.52-sh/2;
+  pctx.drawImage(v,sx,sy,sw,sh,0,0,120,120);
+  const d=pctx.getImageData(0,0,120,120).data;
+  let R=0,G=0,B=0,n=0;
+  for(let i=0;i<d.length;i+=4){const r=d[i],g=d[i+1],b=d[i+2],br=(r+g+b)/3;
+    if(br<45||br>235) continue;            // skip dark / blown-out
+    if(r<=g) continue;                      // conjunctiva mucosa is red-dominant
+    if(Math.abs(r-g)<6 && br>185) continue; // skip bright white sclera
+    R+=r;G+=g;B+=b;n++;}
+  if(n<400){$('eyeHint').textContent='Couldn\'t read it — fill the box with the pink inner eyelid, brighter light';return;}
+  const mr=R/n,mg=G/n,mb=B/n, pinkness=mr-mg, redFrac=mr/(mr+mg+mb);
+  const idx=clamp(Math.round((pinkness-12)/55*100),1,100);  // heuristic 0-100 redness index
+  lastEye={idx,pinkness:+pinkness.toFixed(1),redFrac:+redFrac.toFixed(3),r:Math.round(mr),g:Math.round(mg),b:Math.round(mb),n,ts:Date.now()};
+  closeEye(); renderHb(); uploadEye(lastEye,null);
+}
+function hbCat(idx){ if(idx>=55)return['Looks normal','green']; if(idx>=38)return['Borderline pale','amber']; return['Pale — possible low Hb','red']; }
+function renderHb(){
+  const val=$('hbVal'),unit=$('hbUnit'),note=$('hbNote'),st=$('hbStatus'); if(!val)return;
+  if(!lastEye){val.textContent='—';unit.textContent='redness index';st.textContent='';st.style.background='transparent';
+    note.innerHTML='Tap below, pull your lower eyelid down to show the pink inside, and capture it — an experimental color screen for low hemoglobin (anemia).';return;}
+  val.textContent=lastEye.idx;unit.textContent='/100 redness';
+  const c=hbCat(lastEye.idx);st.textContent=c[0];st.style.color=COL[c[1]];st.style.background=COL[c[1]]+'22';
+  note.innerHTML='Experimental color screen · paler conjunctiva can indicate lower hemoglobin · <b>not a lab test — confirm anemia with bloodwork</b>.';
+}
+function uploadEye(eye,labHb){
+  if(!UPLOAD_URL||!WRITE_KEY||!contributing()||!eye)return;
+  const p=activePerson(),prof=getProfile();
+  const scan={sid:(labHb?'eyelab':'eye')+eye.ts,pid:p.id,name:p.guest?'Guest':(p.name||''),email:p.guest?'':(p.email||''),
+    age:prof.age,sex:prof.sex,bpm:'',bpSys:'',bpDia:'',refHR:'',stress:'',wellness:'',quality:eye.idx,
+    sdnn:'',rmssd:'',rr:'',pnn50:'',
+    ua:'EYE idx='+eye.idx+' pink='+eye.pinkness+' rgb='+eye.r+','+eye.g+','+eye.b+(labHb?' labHb='+labHb:''),
+    appVersion:APP_VER};
+  try{fetch(UPLOAD_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:WRITE_KEY,scan})});}catch(e){}
+}
+$('hbStartBtn').onclick=eyeStart;
+$('eyeCancel').onclick=closeEye;
+$('eyeCapture').onclick=captureEye;
+$('hbLabBtn').onclick=()=>{$('hbLabForm').classList.toggle('hidden');};
+$('hbLabCancel').onclick=()=>{$('hbLabForm').classList.add('hidden');};
+$('hbLabSave').onclick=()=>{
+  const v=+$('hbLab').value;
+  if(!v||v<3||v>25){alert('Enter a valid hemoglobin value (e.g. 14.0 g/dL).');return;}
+  if(!lastEye){alert('Do an eye scan first, then enter the lab value from the same day.');return;}
+  uploadEye(lastEye,v); $('hbLabForm').classList.add('hidden');
+  $('hbNote').innerHTML='Thanks — your lab Hb <b>'+v+' g/dL</b> + this eye scan was added as a training example.';
+};
 
 /* ===================== CONTRIBUTE (opt-in upload to shared dataset) ===================== */
 function uploadScan(rec){
